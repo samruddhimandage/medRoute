@@ -5,8 +5,14 @@ const NearbySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   keywords: z.array(z.string().min(1).max(40)).min(1).max(10),
-  radiusMeters: z.number().min(1000).max(50000).default(25000),
+  radiusMeters: z.number().min(1000).max(200000).default(50000),
 });
+
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
+];
 
 export type Hospital = {
   id: string;
