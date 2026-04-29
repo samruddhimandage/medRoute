@@ -164,12 +164,12 @@ function HomePage() {
           lat: location.lat,
           lng: location.lng,
           keywords: injury.facilityKeywords,
-          radiusMeters: 25000,
+          radiusMeters: 50000,
         },
       });
       if (res.error) toast.error(res.error);
-      if (res.hospitals.length === 0) {
-        toast.error("No hospitals found within 25 km. Try a different location.");
+      if (!res.hospitals || res.hospitals.length === 0) {
+        toast.error("No hospitals found nearby. Please try a different location.");
         return;
       }
       setHospitals(res.hospitals);
