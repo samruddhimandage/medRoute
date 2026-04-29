@@ -185,3 +185,49 @@ export const geocodeAddress = createServerFn({ method: "POST" })
       return { result: null, error: "Unable to look up address." };
     }
   });
+
+const MatrixSchema = z.object({
+  from: z.object({ lat: z.number(), lng: z.number() }),
+  destinations: z.array(z.object({ lat: z.number(), lng: z.number() })).min(1).max(20),
+});
+
+export const getRouteMatrix = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => MatrixSchema.parse(d))
+  .handler(async ({ data }) => {
+    const key = process.env.OPENROUTESERVICE_API_KEY;
+    if (!key) return { results: [] as Array<{ distanceMeters: number; durationSeconds: number } | null>, error: "Routing service not configured." };
+    try {
+      const locations = [
+        [data.from.lng, data.from.lat],
+        ...data.destinations.map((d) => [d.lng, d.lat]),
+      ];
+      const res = await fetch("https://api.openrouteservice.org/v2/matrix/driving-car", {
+        method: "POST",
+        headers: { Authorization: key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locations,
+          sources: [0],
+          destinations: data.destinations.map((_, i) => i + 1),
+          metrics: ["distance", "duration"],
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("ORS matrix error", res.status, text);
+        return { results: data.destinations.map(() => null), error: `Matrix failed (${res.status}).` };
+      }
+      const json = (await res.json()) as { distances?: number[][]; durations?: number[][] };
+      const distances = json.distances?.[0] ?? [];
+      const durations = json.durations?.[0] ?? [];
+      const results = data.destinations.map((_, i) => {
+        const d = distances[i];
+        const t = durations[i];
+        if (typeof d !== "number" || typeof t !== "number") return null;
+        return { distanceMeters: d, durationSeconds: t };
+      });
+      return { results, error: null as string | null };
+    } catch (e) {
+      console.error("ORS matrix fetch failed", e);
+      return { results: data.destinations.map(() => null), error: "Unable to compute distances." };
+    }
+  });
