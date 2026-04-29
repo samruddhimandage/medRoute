@@ -121,14 +121,16 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
         })
         .filter((h): h is Hospital => !!h)
         .sort((a, b) => {
-          // prioritize keyword match, then emergency flag, then distance
-          const score = (h: Hospital) =>
-            h.matchedKeywords.length * 5000 + (h.emergency ? 3000 : 0) - h.distanceMeters / 100;
-          return score(b) - score(a);
+          // Primary: nearest hospitals first.
+          // Specialty-matched hospitals get a small distance "bonus" (1km credit per match)
+          // so a closely-matched hospital can outrank a marginally closer non-match.
+          const eff = (h: Hospital) =>
+            h.distanceMeters - h.matchedKeywords.length * 1000 - (h.emergency ? 500 : 0);
+          return eff(a) - eff(b);
         })
-        .slice(0, 8);
+        .slice(0, 10);
 
-      return { hospitals, error: null as string | null };
+      return { hospitals, error: null as string | null, searchRadiusMeters: usedRadius };
     } catch (e) {
       console.error("Overpass fetch failed", e);
       return { hospitals: [] as Hospital[], error: "Unable to query hospital directory." };
