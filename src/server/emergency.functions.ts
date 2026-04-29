@@ -65,15 +65,26 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
           const blob = JSON.stringify(tags).toLowerCase();
           const matched = kw.filter((k) => blob.includes(k));
           const distanceMeters = haversine({ lat: data.lat, lng: data.lng }, { lat, lng });
+          const addrParts = [
+            tags["addr:housenumber"],
+            tags["addr:street"],
+            tags["addr:suburb"] || tags["addr:neighbourhood"],
+            tags["addr:city"] || tags["addr:district"],
+            tags["addr:state"],
+            tags["addr:postcode"],
+          ].filter(Boolean);
+          const address =
+            tags["addr:full"] ||
+            (addrParts.length > 0 ? addrParts.join(", ") : undefined);
           return {
             id: `${el.type}/${el.id}`,
-            name: tags.name || tags["name:en"] || "Unnamed Hospital",
+            name: tags.name || tags["name:en"] || tags["operator"] || "Unnamed Hospital",
             lat,
             lng,
             distanceMeters,
-            phone: tags.phone || tags["contact:phone"],
-            address: [tags["addr:street"], tags["addr:city"]].filter(Boolean).join(", ") || undefined,
-            emergency: tags.emergency === "yes",
+            phone: tags.phone || tags["contact:phone"] || tags["contact:mobile"],
+            address,
+            emergency: tags.emergency === "yes" || tags["emergency:phone"] !== undefined,
             matchedKeywords: matched,
           } as Hospital;
         })
