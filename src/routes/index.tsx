@@ -407,13 +407,13 @@ function HomePage() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">
-                          #{i + 1} · {formatKm(h.distanceMeters)} away
+                          #{i + 1} · {formatKm(h.distanceMeters)} straight-line
                         </div>
                         <div className="font-display text-lg leading-tight mt-0.5">{h.name}</div>
                         {h.address && (
-                          <div className="text-xs text-muted-foreground mt-1">{h.address}</div>
+                          <div className="text-xs text-muted-foreground mt-1 break-words">{h.address}</div>
                         )}
                       </div>
                       {h.matchedKeywords.length > 0 && (
@@ -437,11 +437,26 @@ function HomePage() {
                           📞 {h.phone}
                         </a>
                       )}
-                      {active && routeMeta && (
-                        <span className="ml-auto font-medium text-foreground">
-                          ETA {formatMin(routeMeta.duration)} · {formatKm(routeMeta.distance)}
-                        </span>
-                      )}
+                      {(() => {
+                        const eta = etas[h.id];
+                        if (eta) {
+                          return (
+                            <span className="ml-auto font-medium text-foreground">
+                              🚑 {formatMin(eta.duration)} · {formatKm(eta.distance)} by road
+                            </span>
+                          );
+                        }
+                        if (active && routeMeta) {
+                          return (
+                            <span className="ml-auto font-medium text-foreground">
+                              🚑 {formatMin(routeMeta.duration)} · {formatKm(routeMeta.distance)}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="ml-auto text-muted-foreground italic">calculating…</span>
+                        );
+                      })()}
                     </div>
                   </button>
                 );
