@@ -46,10 +46,6 @@ function formatMin(s: number) {
 }
 
 function HomePage() {
-  const findHospitalsFn = useServerFn(findNearbyHospitals);
-  const geocodeFn = useServerFn(geocodeAddress);
-  const routeFn = useServerFn(getRoute);
-
   const [location, setLocation] = useState<Coords | null>(null);
   const [locationLabel, setLocationLabel] = useState<string>("");
   const [manualAddress, setManualAddress] = useState("");
@@ -63,7 +59,7 @@ function HomePage() {
   const injury = useMemo(() => INJURY_TYPES.find((i) => i.id === injuryId), [injuryId]);
 
   const detectLocation = useCallback(() => {
-    if (!navigator.geolocation) {
+    if (!("geolocation" in navigator)) {
       toast.error("Geolocation not supported by your browser.");
       return;
     }
@@ -77,28 +73,72 @@ function HomePage() {
       },
       (err) => {
         setLoading(false);
-        toast.error(err.message || "Could not detect location.");
+        const inIframe = window.self !== window.top;
+        if (err.code === 1) {
+          toast.error(
+            inIframe
+              ? "Location is blocked in the preview iframe. Open the app in a new tab, or enter your address manually below."
+              : "Location permission denied. Allow access or enter your address manually."
+          );
+        } else if (err.code === 2) {
+          toast.error("Location unavailable. Please enter your address manually.");
+        } else if (err.code === 3) {
+          toast.error("Location request timed out. Please enter your address manually.");
+        } else {
+          toast.error(err.message || "Could not detect location.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
     );
   }, []);
 
-  const useManualAddress = useCallback(async () => {
-    if (manualAddress.trim().length < 2) {
+  const submitManualAddress = useCallback(async () => {
+    const q = manualAddress.trim();
+    if (q.length < 2) {
       toast.error("Enter a city, address or landmark.");
       return;
     }
     setLoading(true);
-    const res = await geocodeFn({ data: { query: manualAddress.trim() } });
-    setLoading(false);
-    if (res.error || !res.result) {
-      toast.error(res.error || "Could not find that location.");
-      return;
+    try {
+      const res = await geocodeAddress({ data: { query: q } });
+      if (res.error || !res.result) {
+        toast.error(res.error || "Could not find that location.");
+        return;
+      }
+      setLocation({ lat: res.result.lat, lng: res.result.lng });
+      setLocationLabel(res.result.label);
+      toast.success("Location set.");
+    } catch (e) {
+      console.error("geocode failed", e);
+      toast.error("Geocoding service unreachable. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLocation({ lat: res.result.lat, lng: res.result.lng });
-    setLocationLabel(res.result.label);
-    toast.success("Location set.");
-  }, [manualAddress, geocodeFn]);
+  }, [manualAddress]);
+
+  const selectHospital = useCallback(
+    async (h: Hospital) => {
+      if (!location) return;
+      setSelectedHospital(h);
+      setRouteCoords(null);
+      setRouteMeta(null);
+      try {
+        const res = await getRoute({
+          data: { from: location, to: { lat: h.lat, lng: h.lng } },
+        });
+        if (res.error || !res.route) {
+          toast.error(res.error || "Could not compute route.");
+          return;
+        }
+        setRouteCoords(res.route.coordinates);
+        setRouteMeta({ distance: res.route.distanceMeters, duration: res.route.durationSeconds });
+      } catch (e) {
+        console.error("route failed", e);
+        toast.error("Routing service unreachable.");
+      }
+    },
+    [location]
+  );
 
   const handleSearch = useCallback(async () => {
     if (!location) return toast.error("Please set your location first.");
@@ -108,43 +148,29 @@ function HomePage() {
     setSelectedHospital(null);
     setRouteCoords(null);
     setRouteMeta(null);
-    const res = await findHospitalsFn({
-      data: {
-        lat: location.lat,
-        lng: location.lng,
-        keywords: injury.facilityKeywords,
-        radiusMeters: 15000,
-      },
-    });
-    setLoading(false);
-    if (res.error) toast.error(res.error);
-    if (res.hospitals.length === 0) {
-      toast.error("No hospitals found within 15 km.");
-      return;
-    }
-    setHospitals(res.hospitals);
-    // auto-route to top match
-    void selectHospital(res.hospitals[0]);
-  }, [location, injury, findHospitalsFn]);
-
-  const selectHospital = useCallback(
-    async (h: Hospital) => {
-      if (!location) return;
-      setSelectedHospital(h);
-      setRouteCoords(null);
-      setRouteMeta(null);
-      const res = await routeFn({
-        data: { from: location, to: { lat: h.lat, lng: h.lng } },
+    try {
+      const res = await findNearbyHospitals({
+        data: {
+          lat: location.lat,
+          lng: location.lng,
+          keywords: injury.facilityKeywords,
+          radiusMeters: 15000,
+        },
       });
-      if (res.error || !res.route) {
-        toast.error(res.error || "Could not compute route.");
+      if (res.error) toast.error(res.error);
+      if (res.hospitals.length === 0) {
+        toast.error("No hospitals found within 15 km.");
         return;
       }
-      setRouteCoords(res.route.coordinates);
-      setRouteMeta({ distance: res.route.distanceMeters, duration: res.route.durationSeconds });
-    },
-    [location, routeFn]
-  );
+      setHospitals(res.hospitals);
+      void selectHospital(res.hospitals[0]);
+    } catch (e) {
+      console.error("find hospitals failed", e);
+      toast.error("Could not load hospitals. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [location, injury, selectHospital]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
