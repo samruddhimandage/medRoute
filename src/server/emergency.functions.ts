@@ -163,15 +163,22 @@ const GeoSchema = z.object({ query: z.string().min(2).max(200) });
 export const geocodeAddress = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => GeoSchema.parse(d))
   .handler(async ({ data }) => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(data.query)}`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": "EmergencyResponseApp/1.0" },
-      });
-      if (!res.ok) return { result: null, error: `Geocoding failed (${res.status}).` };
+    const headers = { "User-Agent": "MedRouteEmergencyApp/1.0 (contact@medroute.app)" };
+    const tryFetch = async (url: string) => {
+      const res = await fetch(url, { headers });
+      if (!res.ok) return null;
       const json = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
-      const first = json[0];
-      if (!first) return { result: null, error: "Location not found." };
+      return json[0] ?? null;
+    };
+    try {
+      // Bias toward India first (handles short queries like "Andheri East", "Banjara Hills")
+      const indiaUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=${encodeURIComponent(data.query)}`;
+      let first = await tryFetch(indiaUrl);
+      if (!first) {
+        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(data.query)}`;
+        first = await tryFetch(globalUrl);
+      }
+      if (!first) return { result: null, error: "Location not found. Try adding a city or state." };
       return {
         result: {
           lat: parseFloat(first.lat),
