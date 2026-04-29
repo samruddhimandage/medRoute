@@ -5,7 +5,7 @@ const NearbySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   keywords: z.array(z.string().min(1).max(40)).min(1).max(10),
-  radiusMeters: z.number().min(1000).max(50000).default(15000),
+  radiusMeters: z.number().min(1000).max(50000).default(25000),
 });
 
 export type Hospital = {
