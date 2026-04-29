@@ -249,9 +249,9 @@ function HomePage() {
                     placeholder="e.g. 221B Baker Street, London"
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && useManualAddress()}
+                    onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
                   />
-                  <Button onClick={useManualAddress} disabled={loading} variant="outline">
+                  <Button type="button" onClick={submitManualAddress} disabled={loading} variant="outline">
                     Set
                   </Button>
                 </div>
