@@ -4,6 +4,7 @@ import {
   findNearbyHospitals,
   geocodeAddress,
   getRoute,
+  getRouteMatrix,
   type Hospital,
 } from "@/server/emergency.functions";
 import { INJURY_TYPES } from "@/lib/injuryTypes";
