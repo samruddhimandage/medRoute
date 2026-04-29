@@ -48,13 +48,22 @@ type Props = {
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   routeCoords?: [number, number][] | null;
+  alternativeRoutes?: { coordinates: [number, number][]; highlighted?: boolean; label?: string }[];
 };
 
-export function EmergencyMap({ user, hospitals, selectedId, onSelect, routeCoords }: Props) {
+export function EmergencyMap({
+  user,
+  hospitals,
+  selectedId,
+  onSelect,
+  routeCoords,
+  alternativeRoutes,
+}: Props) {
   const fitPoints: [number, number][] = [
     [user.lat, user.lng],
     ...hospitals.map((h) => [h.lat, h.lng] as [number, number]),
     ...(routeCoords ?? []),
+    ...(alternativeRoutes?.flatMap((r) => r.coordinates) ?? []),
   ];
 
   return (
@@ -89,7 +98,19 @@ export function EmergencyMap({ user, hospitals, selectedId, onSelect, routeCoord
           </Popup>
         </Marker>
       ))}
-      {routeCoords && routeCoords.length > 1 && (
+      {alternativeRoutes?.map((r, i) => (
+        <Polyline
+          key={i}
+          positions={r.coordinates}
+          pathOptions={{
+            color: r.highlighted ? "#c9a84c" : "#5a7a9e",
+            weight: r.highlighted ? 6 : 4,
+            opacity: r.highlighted ? 0.95 : 0.55,
+            dashArray: r.highlighted ? undefined : "8 6",
+          }}
+        />
+      ))}
+      {routeCoords && routeCoords.length > 1 && !alternativeRoutes && (
         <Polyline positions={routeCoords} pathOptions={{ color: "#c9a84c", weight: 5, opacity: 0.9 }} />
       )}
       <FitBounds points={fitPoints} />

@@ -191,6 +191,80 @@ export const getRoute = createServerFn({ method: "POST" })
     }
   });
 
+const AltRouteSchema = z.object({
+  from: z.object({ lat: z.number(), lng: z.number() }),
+  to: z.object({ lat: z.number(), lng: z.number() }),
+});
+
+export type RouteOption = {
+  coordinates: [number, number][];
+  distanceMeters: number;
+  durationSeconds: number;
+};
+
+export const getAlternativeRoutes = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => AltRouteSchema.parse(d))
+  .handler(async ({ data }) => {
+    const key = process.env.OPENROUTESERVICE_API_KEY;
+    if (!key) return { routes: [] as RouteOption[], error: "Routing service not configured." };
+    try {
+      const res = await fetch(
+        "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+        {
+          method: "POST",
+          headers: { Authorization: key, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            coordinates: [
+              [data.from.lng, data.from.lat],
+              [data.to.lng, data.to.lat],
+            ],
+            instructions: false,
+            alternative_routes: { target_count: 3, share_factor: 0.6, weight_factor: 1.6 },
+          }),
+        }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("ORS alt error", res.status, text);
+        // Fallback: single route
+        const single = await fetch(
+          "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+          {
+            method: "POST",
+            headers: { Authorization: key, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              coordinates: [
+                [data.from.lng, data.from.lat],
+                [data.to.lng, data.to.lat],
+              ],
+              instructions: false,
+            }),
+          }
+        );
+        if (!single.ok) return { routes: [], error: `Routing failed (${res.status}).` };
+        const sj = (await single.json()) as any;
+        const routes: RouteOption[] = (sj.features ?? []).map((f: any) => ({
+          coordinates: f.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]),
+          distanceMeters: f.properties?.summary?.distance ?? 0,
+          durationSeconds: f.properties?.summary?.duration ?? 0,
+        }));
+        return { routes, error: null as string | null };
+      }
+      const json = (await res.json()) as any;
+      const routes: RouteOption[] = (json.features ?? []).map((f: any) => ({
+        coordinates: f.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]),
+        distanceMeters: f.properties?.summary?.distance ?? 0,
+        durationSeconds: f.properties?.summary?.duration ?? 0,
+      }));
+      // Sort by duration so shortest-by-time is first
+      routes.sort((a, b) => a.durationSeconds - b.durationSeconds);
+      return { routes, error: null as string | null };
+    } catch (e) {
+      console.error("ORS alt fetch failed", e);
+      return { routes: [] as RouteOption[], error: "Unable to compute routes." };
+    }
+  });
+
 const GeoSchema = z.object({ query: z.string().min(2).max(200) });
 
 export const geocodeAddress = createServerFn({ method: "POST" })
