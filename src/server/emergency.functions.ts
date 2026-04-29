@@ -5,7 +5,7 @@ const NearbySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   keywords: z.array(z.string().min(1).max(40)).min(1).max(10),
-  radiusMeters: z.number().min(1000).max(50000).default(15000),
+  radiusMeters: z.number().min(1000).max(50000).default(25000),
 });
 
 export type Hospital = {
@@ -65,15 +65,26 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
           const blob = JSON.stringify(tags).toLowerCase();
           const matched = kw.filter((k) => blob.includes(k));
           const distanceMeters = haversine({ lat: data.lat, lng: data.lng }, { lat, lng });
+          const addrParts = [
+            tags["addr:housenumber"],
+            tags["addr:street"],
+            tags["addr:suburb"] || tags["addr:neighbourhood"],
+            tags["addr:city"] || tags["addr:district"],
+            tags["addr:state"],
+            tags["addr:postcode"],
+          ].filter(Boolean);
+          const address =
+            tags["addr:full"] ||
+            (addrParts.length > 0 ? addrParts.join(", ") : undefined);
           return {
             id: `${el.type}/${el.id}`,
-            name: tags.name || tags["name:en"] || "Unnamed Hospital",
+            name: tags.name || tags["name:en"] || tags["operator"] || "Unnamed Hospital",
             lat,
             lng,
             distanceMeters,
-            phone: tags.phone || tags["contact:phone"],
-            address: [tags["addr:street"], tags["addr:city"]].filter(Boolean).join(", ") || undefined,
-            emergency: tags.emergency === "yes",
+            phone: tags.phone || tags["contact:phone"] || tags["contact:mobile"],
+            address,
+            emergency: tags.emergency === "yes" || tags["emergency:phone"] !== undefined,
             matchedKeywords: matched,
           } as Hospital;
         })
@@ -152,15 +163,22 @@ const GeoSchema = z.object({ query: z.string().min(2).max(200) });
 export const geocodeAddress = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => GeoSchema.parse(d))
   .handler(async ({ data }) => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(data.query)}`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": "EmergencyResponseApp/1.0" },
-      });
-      if (!res.ok) return { result: null, error: `Geocoding failed (${res.status}).` };
+    const headers = { "User-Agent": "MedRouteEmergencyApp/1.0 (contact@medroute.app)" };
+    const tryFetch = async (url: string) => {
+      const res = await fetch(url, { headers });
+      if (!res.ok) return null;
       const json = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
-      const first = json[0];
-      if (!first) return { result: null, error: "Location not found." };
+      return json[0] ?? null;
+    };
+    try {
+      // Bias toward India first (handles short queries like "Andheri East", "Banjara Hills")
+      const indiaUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=${encodeURIComponent(data.query)}`;
+      let first = await tryFetch(indiaUrl);
+      if (!first) {
+        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(data.query)}`;
+        first = await tryFetch(globalUrl);
+      }
+      if (!first) return { result: null, error: "Location not found. Try adding a city or state." };
       return {
         result: {
           lat: parseFloat(first.lat),
@@ -172,5 +190,51 @@ export const geocodeAddress = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("Geocode failed", e);
       return { result: null, error: "Unable to look up address." };
+    }
+  });
+
+const MatrixSchema = z.object({
+  from: z.object({ lat: z.number(), lng: z.number() }),
+  destinations: z.array(z.object({ lat: z.number(), lng: z.number() })).min(1).max(20),
+});
+
+export const getRouteMatrix = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => MatrixSchema.parse(d))
+  .handler(async ({ data }) => {
+    const key = process.env.OPENROUTESERVICE_API_KEY;
+    if (!key) return { results: [] as Array<{ distanceMeters: number; durationSeconds: number } | null>, error: "Routing service not configured." };
+    try {
+      const locations = [
+        [data.from.lng, data.from.lat],
+        ...data.destinations.map((d) => [d.lng, d.lat]),
+      ];
+      const res = await fetch("https://api.openrouteservice.org/v2/matrix/driving-car", {
+        method: "POST",
+        headers: { Authorization: key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locations,
+          sources: [0],
+          destinations: data.destinations.map((_, i) => i + 1),
+          metrics: ["distance", "duration"],
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("ORS matrix error", res.status, text);
+        return { results: data.destinations.map(() => null), error: `Matrix failed (${res.status}).` };
+      }
+      const json = (await res.json()) as { distances?: number[][]; durations?: number[][] };
+      const distances = json.distances?.[0] ?? [];
+      const durations = json.durations?.[0] ?? [];
+      const results = data.destinations.map((_, i) => {
+        const d = distances[i];
+        const t = durations[i];
+        if (typeof d !== "number" || typeof t !== "number") return null;
+        return { distanceMeters: d, durationSeconds: t };
+      });
+      return { results, error: null as string | null };
+    } catch (e) {
+      console.error("ORS matrix fetch failed", e);
+      return { results: data.destinations.map(() => null), error: "Unable to compute distances." };
     }
   });

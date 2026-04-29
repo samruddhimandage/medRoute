@@ -4,6 +4,7 @@ import {
   findNearbyHospitals,
   geocodeAddress,
   getRoute,
+  getRouteMatrix,
   type Hospital,
 } from "@/server/emergency.functions";
 import { INJURY_TYPES } from "@/lib/injuryTypes";
@@ -55,12 +56,17 @@ function HomePage() {
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeMeta, setRouteMeta] = useState<{ distance: number; duration: number } | null>(null);
+  const [etas, setEtas] = useState<Record<string, { distance: number; duration: number } | null>>({});
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const injury = useMemo(() => INJURY_TYPES.find((i) => i.id === injuryId), [injuryId]);
 
   const detectLocation = useCallback(() => {
+    setLocationError(null);
     if (!("geolocation" in navigator)) {
-      toast.error("Geolocation not supported by your browser.");
+      const m = "Geolocation is not supported by your browser. Please enter your address manually.";
+      setLocationError(m);
+      toast.error(m);
       return;
     }
     setLoading(true);
@@ -69,26 +75,28 @@ function HomePage() {
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocationLabel("Detected current location");
         setLoading(false);
+        setLocationError(null);
         toast.success("Location detected.");
       },
       (err) => {
         setLoading(false);
         const inIframe = window.self !== window.top;
+        let msg = "";
         if (err.code === 1) {
-          toast.error(
-            inIframe
-              ? "Location is blocked in the preview iframe. Open the app in a new tab, or enter your address manually below."
-              : "Location permission denied. Allow access or enter your address manually."
-          );
+          msg = inIframe
+            ? "Location is blocked inside the preview. Open this app in a new browser tab, or simply type your city below (e.g. “Mumbai”, “Delhi”, “Andheri East”)."
+            : "Location permission was denied. Allow access in your browser settings, or enter your city/address below.";
         } else if (err.code === 2) {
-          toast.error("Location unavailable. Please enter your address manually.");
+          msg = "Your device couldn’t determine your position. Please type your city or address below.";
         } else if (err.code === 3) {
-          toast.error("Location request timed out. Please enter your address manually.");
+          msg = "Locating timed out. Please type your city or address below.";
         } else {
-          toast.error(err.message || "Could not detect location.");
+          msg = err.message || "Could not detect location. Please enter your address manually.";
         }
+        setLocationError(msg);
+        toast.error(msg);
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
 
@@ -107,6 +115,7 @@ function HomePage() {
       }
       setLocation({ lat: res.result.lat, lng: res.result.lng });
       setLocationLabel(res.result.label);
+      setLocationError(null);
       toast.success("Location set.");
     } catch (e) {
       console.error("geocode failed", e);
@@ -148,22 +157,43 @@ function HomePage() {
     setSelectedHospital(null);
     setRouteCoords(null);
     setRouteMeta(null);
+    setEtas({});
     try {
       const res = await findNearbyHospitals({
         data: {
           lat: location.lat,
           lng: location.lng,
           keywords: injury.facilityKeywords,
-          radiusMeters: 15000,
+          radiusMeters: 25000,
         },
       });
       if (res.error) toast.error(res.error);
       if (res.hospitals.length === 0) {
-        toast.error("No hospitals found within 15 km.");
+        toast.error("No hospitals found within 25 km. Try a different location.");
         return;
       }
       setHospitals(res.hospitals);
       void selectHospital(res.hospitals[0]);
+
+      // Fetch driving ETAs for every listed hospital in one matrix call
+      try {
+        const mx = await getRouteMatrix({
+          data: {
+            from: location,
+            destinations: res.hospitals.map((h) => ({ lat: h.lat, lng: h.lng })),
+          },
+        });
+        if (!mx.error) {
+          const map: Record<string, { distance: number; duration: number } | null> = {};
+          res.hospitals.forEach((h, i) => {
+            const r = mx.results[i];
+            map[h.id] = r ? { distance: r.distanceMeters, duration: r.durationSeconds } : null;
+          });
+          setEtas(map);
+        }
+      } catch (e) {
+        console.error("matrix failed", e);
+      }
     } catch (e) {
       console.error("find hospitals failed", e);
       toast.error("Could not load hospitals. Please try again.");
@@ -242,11 +272,11 @@ function HomePage() {
                 <span className="flex-1 h-px bg-border" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="addr">Address, city or landmark</Label>
+                <Label htmlFor="addr">City, address or landmark (India supported)</Label>
                 <div className="flex gap-2">
                   <Input
                     id="addr"
-                    placeholder="e.g. 221B Baker Street, London"
+                    placeholder="e.g. Andheri East, Mumbai or Connaught Place, Delhi"
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
@@ -255,7 +285,31 @@ function HomePage() {
                     Set
                   </Button>
                 </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setManualAddress(c);
+                        // fire after state update
+                        setTimeout(() => submitManualAddress(), 0);
+                      }}
+                      className="text-[11px] px-2 py-1 rounded-full border border-border hover:bg-accent"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {locationError && !location && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                  <div className="text-xs uppercase tracking-wider text-destructive font-semibold mb-1">
+                    Location unavailable
+                  </div>
+                  <p className="text-foreground/90">{locationError}</p>
+                </div>
+              )}
               {location && (
                 <div className="rounded-md border border-border bg-accent p-3 text-sm">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
@@ -353,13 +407,13 @@ function HomePage() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">
-                          #{i + 1} · {formatKm(h.distanceMeters)} away
+                          #{i + 1} · {formatKm(h.distanceMeters)} straight-line
                         </div>
                         <div className="font-display text-lg leading-tight mt-0.5">{h.name}</div>
                         {h.address && (
-                          <div className="text-xs text-muted-foreground mt-1">{h.address}</div>
+                          <div className="text-xs text-muted-foreground mt-1 break-words">{h.address}</div>
                         )}
                       </div>
                       {h.matchedKeywords.length > 0 && (
@@ -383,11 +437,26 @@ function HomePage() {
                           📞 {h.phone}
                         </a>
                       )}
-                      {active && routeMeta && (
-                        <span className="ml-auto font-medium text-foreground">
-                          ETA {formatMin(routeMeta.duration)} · {formatKm(routeMeta.distance)}
-                        </span>
-                      )}
+                      {(() => {
+                        const eta = etas[h.id];
+                        if (eta) {
+                          return (
+                            <span className="ml-auto font-medium text-foreground">
+                              🚑 {formatMin(eta.duration)} · {formatKm(eta.distance)} by road
+                            </span>
+                          );
+                        }
+                        if (active && routeMeta) {
+                          return (
+                            <span className="ml-auto font-medium text-foreground">
+                              🚑 {formatMin(routeMeta.duration)} · {formatKm(routeMeta.distance)}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="ml-auto text-muted-foreground italic">calculating…</span>
+                        );
+                      })()}
                     </div>
                   </button>
                 );
