@@ -62,8 +62,11 @@ function HomePage() {
   const injury = useMemo(() => INJURY_TYPES.find((i) => i.id === injuryId), [injuryId]);
 
   const detectLocation = useCallback(() => {
+    setLocationError(null);
     if (!("geolocation" in navigator)) {
-      toast.error("Geolocation not supported by your browser.");
+      const m = "Geolocation is not supported by your browser. Please enter your address manually.";
+      setLocationError(m);
+      toast.error(m);
       return;
     }
     setLoading(true);
@@ -72,26 +75,28 @@ function HomePage() {
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocationLabel("Detected current location");
         setLoading(false);
+        setLocationError(null);
         toast.success("Location detected.");
       },
       (err) => {
         setLoading(false);
         const inIframe = window.self !== window.top;
+        let msg = "";
         if (err.code === 1) {
-          toast.error(
-            inIframe
-              ? "Location is blocked in the preview iframe. Open the app in a new tab, or enter your address manually below."
-              : "Location permission denied. Allow access or enter your address manually."
-          );
+          msg = inIframe
+            ? "Location is blocked inside the preview. Open this app in a new browser tab, or simply type your city below (e.g. “Mumbai”, “Delhi”, “Andheri East”)."
+            : "Location permission was denied. Allow access in your browser settings, or enter your city/address below.";
         } else if (err.code === 2) {
-          toast.error("Location unavailable. Please enter your address manually.");
+          msg = "Your device couldn’t determine your position. Please type your city or address below.";
         } else if (err.code === 3) {
-          toast.error("Location request timed out. Please enter your address manually.");
+          msg = "Locating timed out. Please type your city or address below.";
         } else {
-          toast.error(err.message || "Could not detect location.");
+          msg = err.message || "Could not detect location. Please enter your address manually.";
         }
+        setLocationError(msg);
+        toast.error(msg);
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
 
