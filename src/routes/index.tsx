@@ -372,7 +372,7 @@ function HomePage() {
           <div>
             <div className="font-display text-xl">Find care now</div>
             <p className="text-sm text-muted-foreground">
-              We will match specialty-equipped hospitals within 15 km and route the fastest path.
+              We'll find the nearest hospitals matched to your emergency and chart the fastest ambulance route.
             </p>
           </div>
           <Button
