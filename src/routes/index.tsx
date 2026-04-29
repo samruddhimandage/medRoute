@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState, lazy, Suspense } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import {
   findNearbyHospitals,
   geocodeAddress,
