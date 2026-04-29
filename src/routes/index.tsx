@@ -164,12 +164,12 @@ function HomePage() {
           lat: location.lat,
           lng: location.lng,
           keywords: injury.facilityKeywords,
-          radiusMeters: 25000,
+          radiusMeters: 50000,
         },
       });
       if (res.error) toast.error(res.error);
-      if (res.hospitals.length === 0) {
-        toast.error("No hospitals found within 25 km. Try a different location.");
+      if (!res.hospitals || res.hospitals.length === 0) {
+        toast.error("No hospitals found nearby. Please try a different location.");
         return;
       }
       setHospitals(res.hospitals);
@@ -372,7 +372,7 @@ function HomePage() {
           <div>
             <div className="font-display text-xl">Find care now</div>
             <p className="text-sm text-muted-foreground">
-              We will match specialty-equipped hospitals within 15 km and route the fastest path.
+              We'll find the nearest hospitals matched to your emergency and chart the fastest ambulance route.
             </p>
           </div>
           <Button

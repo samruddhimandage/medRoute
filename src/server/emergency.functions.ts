@@ -5,8 +5,14 @@ const NearbySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   keywords: z.array(z.string().min(1).max(40)).min(1).max(10),
-  radiusMeters: z.number().min(1000).max(50000).default(25000),
+  radiusMeters: z.number().min(1000).max(200000).default(50000),
 });
+
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
+];
 
 export type Hospital = {
   id: string;
@@ -35,25 +41,50 @@ function haversine(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
 export const findNearbyHospitals = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => NearbySchema.parse(d))
   .handler(async ({ data }) => {
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["amenity"="hospital"](around:${data.radiusMeters},${data.lat},${data.lng});
-        way["amenity"="hospital"](around:${data.radiusMeters},${data.lat},${data.lng});
-        relation["amenity"="hospital"](around:${data.radiusMeters},${data.lat},${data.lng});
-      );
-      out center tags 50;
-    `;
-    try {
-      const res = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "data=" + encodeURIComponent(query),
-      });
-      if (!res.ok) {
-        return { hospitals: [] as Hospital[], error: `Overpass error ${res.status}` };
+    // Expanding radius search so users always get the NEAREST hospitals
+    // even when none exist within the initial radius.
+    const radii = [data.radiusMeters, 50000, 100000, 200000].filter(
+      (v, i, a) => a.indexOf(v) === i
+    );
+
+    const fetchOverpass = async (radius: number) => {
+      const query = `[out:json][timeout:25];(node["amenity"="hospital"](around:${radius},${data.lat},${data.lng});way["amenity"="hospital"](around:${radius},${data.lat},${data.lng});relation["amenity"="hospital"](around:${radius},${data.lat},${data.lng}););out center tags 80;`;
+      for (const url of OVERPASS_ENDPOINTS) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              Accept: "application/json",
+              "User-Agent": "MedRouteEmergencyApp/1.0 (contact@medroute.app)",
+            },
+            body: "data=" + encodeURIComponent(query),
+          });
+          if (!res.ok) {
+            console.error("Overpass endpoint", url, "status", res.status);
+            continue;
+          }
+          return (await res.json()) as { elements: Array<any> };
+        } catch (e) {
+          console.error("Overpass endpoint", url, "fetch failed", e);
+        }
       }
-      const json = (await res.json()) as { elements: Array<any> };
+      return null;
+    };
+
+    try {
+      let json: { elements: Array<any> } | null = null;
+      let usedRadius = data.radiusMeters;
+      for (const r of radii) {
+        json = await fetchOverpass(r);
+        if (json && json.elements && json.elements.length > 0) {
+          usedRadius = r;
+          break;
+        }
+      }
+      if (!json) {
+        return { hospitals: [] as Hospital[], error: "Hospital directory is unreachable. Please try again." };
+      }
       const kw = data.keywords.map((k) => k.toLowerCase());
 
       const hospitals: Hospital[] = json.elements
@@ -90,14 +121,16 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
         })
         .filter((h): h is Hospital => !!h)
         .sort((a, b) => {
-          // prioritize keyword match, then emergency flag, then distance
-          const score = (h: Hospital) =>
-            h.matchedKeywords.length * 5000 + (h.emergency ? 3000 : 0) - h.distanceMeters / 100;
-          return score(b) - score(a);
+          // Primary: nearest hospitals first.
+          // Specialty-matched hospitals get a small distance "bonus" (1km credit per match)
+          // so a closely-matched hospital can outrank a marginally closer non-match.
+          const eff = (h: Hospital) =>
+            h.distanceMeters - h.matchedKeywords.length * 1000 - (h.emergency ? 500 : 0);
+          return eff(a) - eff(b);
         })
-        .slice(0, 8);
+        .slice(0, 10);
 
-      return { hospitals, error: null as string | null };
+      return { hospitals, error: null as string | null, searchRadiusMeters: usedRadius };
     } catch (e) {
       console.error("Overpass fetch failed", e);
       return { hospitals: [] as Hospital[], error: "Unable to query hospital directory." };
