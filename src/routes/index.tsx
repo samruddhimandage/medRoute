@@ -56,6 +56,8 @@ function HomePage() {
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeMeta, setRouteMeta] = useState<{ distance: number; duration: number } | null>(null);
+  const [etas, setEtas] = useState<Record<string, { distance: number; duration: number } | null>>({});
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const injury = useMemo(() => INJURY_TYPES.find((i) => i.id === injuryId), [injuryId]);
 
