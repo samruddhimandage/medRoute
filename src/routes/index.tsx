@@ -272,11 +272,11 @@ function HomePage() {
                 <span className="flex-1 h-px bg-border" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="addr">Address, city or landmark</Label>
+                <Label htmlFor="addr">City, address or landmark (India supported)</Label>
                 <div className="flex gap-2">
                   <Input
                     id="addr"
-                    placeholder="e.g. 221B Baker Street, London"
+                    placeholder="e.g. Andheri East, Mumbai or Connaught Place, Delhi"
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
@@ -285,7 +285,31 @@ function HomePage() {
                     Set
                   </Button>
                 </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setManualAddress(c);
+                        // fire after state update
+                        setTimeout(() => submitManualAddress(), 0);
+                      }}
+                      className="text-[11px] px-2 py-1 rounded-full border border-border hover:bg-accent"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {locationError && !location && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                  <div className="text-xs uppercase tracking-wider text-destructive font-semibold mb-1">
+                    Location unavailable
+                  </div>
+                  <p className="text-foreground/90">{locationError}</p>
+                </div>
+              )}
               {location && (
                 <div className="rounded-md border border-border bg-accent p-3 text-sm">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
