@@ -115,6 +115,7 @@ function HomePage() {
       }
       setLocation({ lat: res.result.lat, lng: res.result.lng });
       setLocationLabel(res.result.label);
+      setLocationError(null);
       toast.success("Location set.");
     } catch (e) {
       console.error("geocode failed", e);
