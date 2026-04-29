@@ -157,22 +157,43 @@ function HomePage() {
     setSelectedHospital(null);
     setRouteCoords(null);
     setRouteMeta(null);
+    setEtas({});
     try {
       const res = await findNearbyHospitals({
         data: {
           lat: location.lat,
           lng: location.lng,
           keywords: injury.facilityKeywords,
-          radiusMeters: 15000,
+          radiusMeters: 25000,
         },
       });
       if (res.error) toast.error(res.error);
       if (res.hospitals.length === 0) {
-        toast.error("No hospitals found within 15 km.");
+        toast.error("No hospitals found within 25 km. Try a different location.");
         return;
       }
       setHospitals(res.hospitals);
       void selectHospital(res.hospitals[0]);
+
+      // Fetch driving ETAs for every listed hospital in one matrix call
+      try {
+        const mx = await getRouteMatrix({
+          data: {
+            from: location,
+            destinations: res.hospitals.map((h) => ({ lat: h.lat, lng: h.lng })),
+          },
+        });
+        if (!mx.error) {
+          const map: Record<string, { distance: number; duration: number } | null> = {};
+          res.hospitals.forEach((h, i) => {
+            const r = mx.results[i];
+            map[h.id] = r ? { distance: r.distanceMeters, duration: r.durationSeconds } : null;
+          });
+          setEtas(map);
+        }
+      } catch (e) {
+        console.error("matrix failed", e);
+      }
     } catch (e) {
       console.error("find hospitals failed", e);
       toast.error("Could not load hospitals. Please try again.");
