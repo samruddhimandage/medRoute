@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Phone, Plus } from "lucide-react";
+import { Phone, Plus, X } from "lucide-react";
+import { useState } from "react";
 
 type Props = {
   step?: 1 | 2 | 3;
@@ -9,6 +10,7 @@ type Props = {
 const STEPS = ["Triage", "Hospitals", "Route"];
 
 export function SiteHeader({ step, stepLabel }: Props) {
+  const [showCall, setShowCall] = useState(false);
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between gap-4">
