@@ -1,14 +1,31 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
+import {
+  MapPin,
+  Locate,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
+  Brain,
+  HeartPulse,
+  Droplet,
+  Bone,
+  Flame,
+  Wind,
+  Baby,
+  Stethoscope,
+  Plus,
+  type LucideIcon,
+} from "lucide-react";
 import { geocodeAddress } from "@/server/emergency.functions";
-import { INJURY_TYPES } from "@/lib/injuryTypes";
+import { INJURY_TYPES, type InjuryType } from "@/lib/injuryTypes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState, type Coords } from "@/lib/emergencyStore";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,6 +45,18 @@ export const Route = createFileRoute("/")({
   }),
   component: HomePage,
 });
+
+const ICON_MAP: Record<InjuryType["icon"], LucideIcon> = {
+  Brain,
+  HeartPulse,
+  Droplet,
+  Bone,
+  Flame,
+  Wind,
+  Baby,
+  Stethoscope,
+  Plus,
+};
 
 function HomePage() {
   const navigate = useNavigate();
@@ -65,12 +94,12 @@ function HomePage() {
         let msg = "";
         if (err.code === 1) {
           msg = inIframe
-            ? "Location is blocked inside the preview. Open this app in a new browser tab, or simply type your city below (e.g. “Mumbai”, “Delhi”, “Andheri East”)."
-            : "Location permission was denied. Allow access in your browser settings, or enter your city/address below.";
+            ? "Location is blocked inside the preview. Open in a new tab, or type your city below."
+            : "Permission denied. Allow access in browser settings, or enter your city below.";
         } else if (err.code === 2) {
-          msg = "Your device couldn’t determine your position. Please type your city or address below.";
+          msg = "Position unavailable. Please type your city or address below.";
         } else if (err.code === 3) {
-          msg = "Locating timed out. Please type your city or address below.";
+          msg = "Location request timed out. Please type your city or address below.";
         } else {
           msg = err.message || "Could not detect location. Please enter your address manually.";
         }
@@ -123,190 +152,206 @@ function HomePage() {
     navigate({ to: "/hospitals" });
   }, [location, locationLabel, injury, navigate]);
 
+  const ready = !!location && !!injury;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
+      <SiteHeader step={1} stepLabel="Triage" />
 
-      <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-gold text-gold-foreground flex items-center justify-center font-display text-xl font-semibold">
-              M
-            </div>
-            <div>
-              <div className="font-display text-xl leading-none">MedRoute</div>
-              <div className="text-xs opacity-70 tracking-wide uppercase">
-                Emergency Response System
-              </div>
-            </div>
-          </div>
-          <a
-            href="tel:112"
-            className="hidden sm:inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90 transition"
-          >
-            Call 112 / 911
-          </a>
-        </div>
-      </header>
-
+      {/* Hero */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
-          <p className="text-xs uppercase tracking-[0.2em] text-secondary mb-4">
-            Step 1 of 3 · Triage
-          </p>
-          <h1 className="font-display text-4xl md:text-5xl leading-tight max-w-3xl">
-            The nearest qualified care, on the fastest possible route.
+        <div className="mx-auto max-w-6xl px-6 pt-12 pb-10">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/60 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-[--gold]" />
+            Step 1 of 3
+          </div>
+          <h1 className="mt-5 text-3xl md:text-4xl font-semibold tracking-tight max-w-2xl">
+            Get to the right hospital, fast.
           </h1>
-          <p className="mt-4 max-w-2xl text-muted-foreground">
-            Provide your location and the nature of the emergency. We'll then suggest matched
-            hospitals and the fastest ambulance route.
+          <p className="mt-3 max-w-xl text-[15px] text-muted-foreground">
+            Set your location and the type of emergency. We'll match you with
+            the nearest qualified hospital and the fastest ambulance route.
           </p>
-          <div className="gold-rule mt-8 max-w-md" />
+          <div className="gold-rule mt-6" />
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="p-6 shadow-soft">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="h-7 w-7 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">
-                1
-              </span>
-              <h2 className="font-display text-2xl">Your location</h2>
+      <section className="mx-auto max-w-6xl px-6 py-10 space-y-8">
+        {/* Step 1 — Location */}
+        <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
+              1
             </div>
-            <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Your location</h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div>
               <Button
                 onClick={detectLocation}
                 disabled={loading}
-                className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                size="lg"
+                className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
               >
-                Detect my current location
+                <Locate className="h-4 w-4" />
+                {loading ? "Detecting…" : "Detect my location"}
               </Button>
-              <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
-                <span className="flex-1 h-px bg-border" />
-                or enter manually
-                <span className="flex-1 h-px bg-border" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="addr">City, address or landmark (India supported)</Label>
-                <div className="flex gap-2">
+              <p className="mt-2 text-xs text-muted-foreground text-center">
+                Uses your device GPS · permission required
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="addr" className="text-xs uppercase tracking-wider text-muted-foreground">
+                Or enter manually
+              </Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="addr"
-                    placeholder="e.g. Andheri East, Mumbai or Connaught Place, Delhi"
+                    placeholder="City, address or landmark"
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
+                    className="h-12 pl-9"
                   />
-                  <Button
-                    type="button"
-                    onClick={() => submitManualAddress()}
-                    disabled={loading}
-                    variant="outline"
-                  >
-                    Set
-                  </Button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune"].map(
-                    (c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => {
-                          setManualAddress(c);
-                          submitManualAddress(c);
-                        }}
-                        className="text-[11px] px-2 py-1 rounded-full border border-border hover:bg-accent"
-                      >
-                        {c}
-                      </button>
-                    )
-                  )}
+                <Button
+                  type="button"
+                  onClick={() => submitManualAddress()}
+                  disabled={loading}
+                  variant="outline"
+                  size="lg"
+                  className="h-12"
+                >
+                  Set
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune"].map(
+                  (c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setManualAddress(c);
+                        submitManualAddress(c);
+                      }}
+                      className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-card hover:bg-accent hover:border-accent transition"
+                    >
+                      {c}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
+          {locationError && !location && (
+            <div className="mt-5 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm flex gap-3">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-destructive">Location unavailable</div>
+                <p className="text-muted-foreground mt-0.5">{locationError}</p>
+              </div>
+            </div>
+          )}
+
+          {location && (
+            <div className="mt-5 rounded-lg border border-[--gold]/30 bg-accent/40 p-4 text-sm flex gap-3">
+              <CheckCircle2 className="h-4 w-4 text-[--gold] shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Location confirmed
+                </div>
+                <div className="font-medium truncate">{locationLabel}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
                 </div>
               </div>
-              {locationError && !location && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
-                  <div className="text-xs uppercase tracking-wider text-destructive font-semibold mb-1">
-                    Location unavailable
-                  </div>
-                  <p className="text-foreground/90">{locationError}</p>
-                </div>
-              )}
-              {location && (
-                <div className="rounded-md border border-border bg-accent p-3 text-sm">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                    Confirmed location
-                  </div>
-                  <div className="text-foreground line-clamp-2">{locationLabel}</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                  </div>
-                </div>
-              )}
             </div>
-          </Card>
-
-          <Card className="p-6 shadow-soft">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="h-7 w-7 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">
-                2
-              </span>
-              <h2 className="font-display text-2xl">Nature of emergency</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {INJURY_TYPES.map((t) => {
-                const active = t.id === injuryId;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setInjuryId(t.id)}
-                    className={`text-left rounded-md border p-3 transition ${
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card hover:border-secondary"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{t.label}</span>
-                      {t.severity === "critical" && (
-                        <span
-                          className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            active
-                              ? "bg-gold text-gold-foreground"
-                              : "bg-destructive text-destructive-foreground"
-                          }`}
-                        >
-                          Critical
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      className={`text-xs mt-1 ${active ? "opacity-80" : "text-muted-foreground"}`}
-                    >
-                      {t.description}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
+          )}
         </div>
 
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-md border border-border bg-card p-5">
-          <div>
-            <div className="font-display text-xl">Find care now</div>
-            <p className="text-sm text-muted-foreground">
-              We'll suggest the nearest hospitals matched to your emergency on the next page.
-            </p>
+        {/* Step 2 — Emergency */}
+        <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
+              2
+            </div>
+            <h2 className="text-xl font-semibold">Nature of emergency</h2>
           </div>
-          <Button
-            onClick={handleSearch}
-            disabled={loading || !location || !injury}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-6 text-base"
-          >
-            {loading ? "Please wait…" : "Find care now →"}
-          </Button>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {INJURY_TYPES.map((t) => {
+              const Icon = ICON_MAP[t.icon];
+              const active = t.id === injuryId;
+              const critical = t.severity === "critical";
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setInjuryId(t.id)}
+                  className={`group relative text-left rounded-xl border p-4 transition-all ${
+                    active
+                      ? "border-primary bg-primary/[0.04] ring-2 ring-primary/30 shadow-sm"
+                      : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+                  }`}
+                >
+                  {critical && (
+                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-destructive">
+                      <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                      Critical
+                    </span>
+                  )}
+                  <div
+                    className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 transition ${
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : critical
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-accent text-accent-foreground"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="font-semibold text-sm leading-tight">{t.label}</div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                    {t.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CTA bar */}
+        <div className="sticky bottom-4 z-20">
+          <div className="rounded-2xl border border-border bg-card/95 backdrop-blur shadow-[var(--shadow-elevated)] p-4 md:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-sm">
+              <div className={`h-2 w-2 rounded-full ${ready ? "bg-[--gold]" : "bg-muted-foreground/30"}`} />
+              <div>
+                <div className="font-medium">
+                  {ready ? "Ready to find care" : "Complete both steps to continue"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {location ? "✓ Location" : "○ Location"} · {injury ? `✓ ${injury.label}` : "○ Emergency type"}
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={handleSearch}
+              disabled={loading || !ready}
+              size="lg"
+              className="w-full sm:w-auto h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold disabled:opacity-50"
+            >
+              {loading ? "Please wait…" : "Find care now"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </section>
     </div>

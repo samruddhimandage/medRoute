@@ -1,13 +1,19 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, lazy, Suspense } from "react";
 import {
-  getAlternativeRoutes,
-  type RouteOption,
-} from "@/server/emergency.functions";
+  ArrowLeft,
+  RefreshCw,
+  Clock,
+  Navigation,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
+import { getAlternativeRoutes, type RouteOption } from "@/server/emergency.functions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { useEmergencyState } from "@/lib/emergencyStore";
+import { SiteHeader } from "@/components/SiteHeader";
 
 const EmergencyMap = lazy(() => import("@/components/EmergencyMap"));
 
@@ -26,7 +32,7 @@ function formatKm(m: number) {
 }
 function formatMin(s: number) {
   const min = Math.round(s / 60);
-  return min < 1 ? "< 1 min" : `${min} min`;
+  return min < 1 ? "< 1" : `${min}`;
 }
 
 function RoutePage() {
@@ -78,7 +84,7 @@ function RoutePage() {
 
   if (!state.location || !hospital) return null;
 
-  const fastestIdx = 0; // routes are sorted by duration asc
+  const fastestIdx = 0;
   const altRoutes = (routes ?? []).map((r, i) => ({
     coordinates: r.coordinates,
     highlighted: i === selectedIdx,
@@ -88,132 +94,146 @@ function RoutePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
-      <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-gold text-gold-foreground flex items-center justify-center font-display text-xl font-semibold">
-              M
-            </div>
-            <div>
-              <div className="font-display text-xl leading-none">MedRoute</div>
-              <div className="text-xs opacity-70 tracking-wide uppercase">
-                Step 3 of 3 · Ambulance route
-              </div>
-            </div>
-          </Link>
-          <a
-            href="tel:112"
-            className="hidden sm:inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90 transition"
-          >
-            Call 112 / 911
-          </a>
-        </div>
-      </header>
+      <SiteHeader step={3} stepLabel="Route" />
 
       <section className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+        {/* Title bar */}
+        <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.2em] text-secondary">
-              Destination · {state.injury?.label}
-            </p>
-            <h1 className="font-display text-3xl mt-1 leading-tight">{hospital.name}</h1>
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 text-destructive px-2 py-0.5 font-semibold text-[10px]">
+                {state.injury?.label}
+              </span>
+              <span>Destination</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight leading-tight">
+              {hospital.name}
+            </h1>
             {hospital.address && (
-              <p className="text-sm text-muted-foreground mt-1">{hospital.address}</p>
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{hospital.address}</p>
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/hospitals" })}>
-              ← Choose another hospital
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: "/hospitals" })}>
+              <ArrowLeft className="h-3.5 w-3.5" /> Hospitals
             </Button>
-            <Button variant="outline" onClick={load} disabled={loading}>
-              {loading ? "Refreshing…" : "Refresh routes"}
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
             {errorMsg}
           </div>
         )}
 
         {loading && !routes && (
-          <div className="text-center text-muted-foreground py-16">
-            Calculating possible ambulance routes…
+          <div className="flex flex-col items-center justify-center text-muted-foreground py-20">
+            <Loader2 className="h-6 w-6 animate-spin mb-3 text-primary" />
+            <div className="text-sm">Calculating possible ambulance routes…</div>
           </div>
         )}
 
         {routes && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
             <div className="space-y-3">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {routes.length} possible route{routes.length === 1 ? "" : "s"} · sorted by time
-              </div>
-              {routes.map((r, i) => {
-                const active = selectedIdx === i;
-                const isFastest = i === fastestIdx;
-                return (
-                  <Card
-                    key={i}
-                    onClick={() => setSelectedIdx(i)}
-                    className={`p-4 cursor-pointer transition ${
-                      active ? "border-gold shadow-elevated" : "hover:border-secondary"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs text-muted-foreground">
-                          Option {i + 1}
-                          {isFastest && (
-                            <span className="ml-2 bg-gold text-gold-foreground px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                              Shortest by time
-                            </span>
-                          )}
-                        </div>
-                        <div className="font-display text-2xl mt-1">
-                          {formatMin(r.durationSeconds)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatKm(r.distanceMeters)} by road
-                        </div>
-                      </div>
-                      <div
-                        className={`h-3 w-3 rounded-full ${
-                          active ? "bg-gold" : "bg-muted"
-                        }`}
-                      />
-                    </div>
-                  </Card>
-                );
-              })}
-
+              {/* Recommended banner */}
               {routes.length > 0 && (
-                <div className="rounded-md border border-gold bg-card p-4 mt-4">
-                  <div className="text-xs uppercase tracking-wider text-secondary mb-1">
-                    Recommended
+                <div className="rounded-xl border-2 border-primary/40 bg-primary/[0.04] p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                    <Sparkles className="h-3 w-3" /> Recommended
                   </div>
-                  <div className="font-display text-lg">
-                    Take the fastest route — {formatMin(routes[0].durationSeconds)} (
-                    {formatKm(routes[0].distanceMeters)})
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-foreground">
+                      {formatMin(routes[0].durationSeconds)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">min</span>
+                    <span className="text-sm text-muted-foreground">
+                      · {formatKm(routes[0].distanceMeters)}
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Based on current driving estimates from OpenRouteService.
+                    Fastest route based on current driving estimates.
                   </p>
                   <Button
                     onClick={() => setSelectedIdx(0)}
                     className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90"
                   >
-                    Show fastest on map
+                    Show fastest route on map
                   </Button>
                 </div>
               )}
+
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground pt-2 px-1">
+                {routes.length} route{routes.length === 1 ? "" : "s"} · sorted by time
+              </div>
+
+              {routes.map((r, i) => {
+                const active = selectedIdx === i;
+                const isFastest = i === fastestIdx;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedIdx(i)}
+                    className={`w-full text-left rounded-xl border p-4 transition-all bg-card ${
+                      active
+                        ? "border-primary ring-2 ring-primary/20 shadow-[var(--shadow-soft)]"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold ${
+                            isFastest
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {i + 1}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              Option {i + 1}
+                            </span>
+                            {isFastest && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                Fastest
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-baseline gap-3 mt-0.5">
+                            <div className="flex items-baseline gap-1">
+                              <Clock className="h-3.5 w-3.5 text-primary self-center" />
+                              <span className="text-xl font-bold">
+                                {formatMin(r.durationSeconds)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">min</span>
+                            </div>
+                            <div className="flex items-baseline gap-1 text-sm text-muted-foreground">
+                              <Navigation className="h-3 w-3 self-center" />
+                              {formatKm(r.distanceMeters)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {active && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="rounded-md overflow-hidden border border-border h-[600px]">
+            {/* Map */}
+            <div className="lg:sticky lg:top-20 self-start rounded-xl overflow-hidden border border-border shadow-[var(--shadow-card)] h-[640px] bg-card">
               <Suspense
                 fallback={
                   <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Loading map…
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                 }
               >
