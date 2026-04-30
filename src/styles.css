@@ -31,44 +31,47 @@
   --color-ring: var(--ring);
   --color-gold: var(--gold);
   --color-gold-foreground: var(--gold-foreground);
-  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
-  --shadow-elevated: 0 24px 60px -20px color-mix(in oklab, var(--primary) 35%, transparent);
-  --shadow-soft: 0 8px 30px -12px color-mix(in oklab, var(--primary) 18%, transparent);
+  --shadow-elevated: 0 20px 50px -24px color-mix(in oklab, var(--primary) 28%, transparent);
+  --shadow-soft: 0 6px 20px -10px color-mix(in oklab, var(--primary) 14%, transparent);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
 }
 
 :root {
-  --radius: 0.5rem;
-  /* Clinical Calm: deep teal navy + cream + gold */
-  --background: oklch(0.97 0.018 85);          /* warm cream */
-  --foreground: oklch(0.22 0.05 240);          /* deep teal navy */
-  --card: oklch(0.99 0.01 85);
-  --card-foreground: oklch(0.22 0.05 240);
-  --popover: oklch(0.99 0.01 85);
-  --popover-foreground: oklch(0.22 0.05 240);
-  --primary: oklch(0.27 0.06 235);             /* #0c2340 deep navy teal */
-  --primary-foreground: oklch(0.97 0.018 85);
-  --secondary: oklch(0.42 0.07 230);           /* #1a4a6e mid teal */
-  --secondary-foreground: oklch(0.97 0.018 85);
-  --muted: oklch(0.93 0.015 85);
-  --muted-foreground: oklch(0.45 0.04 235);
-  --accent: oklch(0.92 0.025 85);
-  --accent-foreground: oklch(0.27 0.06 235);
-  --destructive: oklch(0.55 0.21 27);
-  --destructive-foreground: oklch(0.98 0.01 85);
-  --border: oklch(0.86 0.02 85);
-  --input: oklch(0.9 0.018 85);
-  --ring: oklch(0.42 0.07 230);
-  --gold: oklch(0.74 0.13 80);                 /* #c9a84c */
-  --gold-foreground: oklch(0.22 0.05 240);
-  --sidebar: oklch(0.97 0.018 85);
-  --sidebar-foreground: oklch(0.22 0.05 240);
-  --sidebar-primary: oklch(0.27 0.06 235);
-  --sidebar-primary-foreground: oklch(0.97 0.018 85);
-  --sidebar-accent: oklch(0.92 0.025 85);
-  --sidebar-accent-foreground: oklch(0.27 0.06 235);
-  --sidebar-border: oklch(0.86 0.02 85);
-  --sidebar-ring: oklch(0.42 0.07 230);
+  --radius: 0.75rem;
+  /* Clinical Calm: deep medical blue + clean white + soft gray + teal accent */
+  --background: oklch(0.985 0.003 240);        /* near white, faint blue */
+  --foreground: oklch(0.21 0.04 250);          /* deep ink navy */
+  --card: oklch(1 0 0);                        /* pure white cards */
+  --card-foreground: oklch(0.21 0.04 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.04 250);
+  --primary: oklch(0.34 0.09 252);             /* deep medical blue */
+  --primary-foreground: oklch(0.99 0.003 240);
+  --secondary: oklch(0.94 0.012 240);          /* cool light gray */
+  --secondary-foreground: oklch(0.34 0.09 252);
+  --muted: oklch(0.96 0.006 240);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.93 0.04 200);              /* soft teal accent */
+  --accent-foreground: oklch(0.28 0.08 230);
+  --destructive: oklch(0.58 0.2 27);           /* clean medical red */
+  --destructive-foreground: oklch(0.99 0.003 240);
+  --border: oklch(0.91 0.008 240);
+  --input: oklch(0.93 0.008 240);
+  --ring: oklch(0.55 0.12 240);
+  --gold: oklch(0.7 0.15 195);                 /* teal highlight (renamed conceptually) */
+  --gold-foreground: oklch(0.99 0.003 240);
+  --sidebar: oklch(0.985 0.003 240);
+  --sidebar-foreground: oklch(0.21 0.04 250);
+  --sidebar-primary: oklch(0.34 0.09 252);
+  --sidebar-primary-foreground: oklch(0.99 0.003 240);
+  --sidebar-accent: oklch(0.93 0.04 200);
+  --sidebar-accent-foreground: oklch(0.28 0.08 230);
+  --sidebar-border: oklch(0.91 0.008 240);
+  --sidebar-ring: oklch(0.55 0.12 240);
+  --critical: oklch(0.58 0.2 27);
+  --critical-soft: oklch(0.96 0.04 27);
 }
 
 @layer base {
@@ -83,16 +86,25 @@
   }
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    font-weight: 600;
   }
 }
 
 .gold-rule {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  height: 2px;
+  width: 36px;
+  background: var(--gold);
+  border-radius: 2px;
 }
 
 .leaflet-container {
   border-radius: var(--radius-lg);
   font-family: var(--font-sans);
+}
+
+.leaflet-control-zoom a {
+  background: white !important;
+  color: var(--primary) !important;
+  border-color: var(--border) !important;
 }
