@@ -1,11 +1,22 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, lazy, Suspense } from "react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  ArrowRight,
+  Phone,
+  Clock,
+  Navigation,
+  Loader2,
+  MapPin,
+  Sparkles,
+} from "lucide-react";
 import { findNearbyHospitals, getRouteMatrix, type Hospital } from "@/server/emergency.functions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState } from "@/lib/emergencyStore";
+import { SiteHeader } from "@/components/SiteHeader";
 
 const EmergencyMap = lazy(() => import("@/components/EmergencyMap"));
 
@@ -27,7 +38,7 @@ function formatKm(m: number) {
 }
 function formatMin(s: number) {
   const min = Math.round(s / 60);
-  return min < 1 ? "< 1 min" : `${min} min`;
+  return min < 1 ? "< 1" : `${min}`;
 }
 
 function HospitalsPage() {
@@ -37,7 +48,6 @@ function HospitalsPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    // Guard: must have location + injury to be on this page
     if (!state.location || !state.injury) {
       navigate({ to: "/" });
       return;
@@ -101,7 +111,6 @@ function HospitalsPage() {
 
   if (!state.location || !state.injury) return null;
 
-  // Sort hospitals by ETA when available, fallback to straight-line distance
   const hospitals = [...(state.hospitals ?? [])].sort((a, b) => {
     const ea = state.etas[a.id]?.duration;
     const eb = state.etas[b.id]?.duration;
@@ -114,137 +123,157 @@ function HospitalsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
-      <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-gold text-gold-foreground flex items-center justify-center font-display text-xl font-semibold">
-              M
-            </div>
-            <div>
-              <div className="font-display text-xl leading-none">MedRoute</div>
-              <div className="text-xs opacity-70 tracking-wide uppercase">
-                Step 2 of 3 · Suggested hospitals
-              </div>
-            </div>
-          </Link>
-          <a
-            href="tel:112"
-            className="hidden sm:inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90 transition"
-          >
-            Call 112 / 911
-          </a>
-        </div>
-      </header>
+      <SiteHeader step={2} stepLabel="Hospitals" />
 
       <section className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-secondary">
-              {state.injury.label} · {state.locationLabel}
+        {/* Title bar */}
+        <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 text-destructive px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
+                {state.injury.label}
+              </span>
+              <MapPin className="h-3 w-3" />
+              <span className="truncate max-w-[260px]">{state.locationLabel}</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+              Recommended hospitals
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sorted by driving time · specialty-matched first
             </p>
-            <h1 className="font-display text-3xl mt-1">Recommended hospitals nearby</h1>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/" })}>
-              ← Change details
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: "/" })}>
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
             </Button>
-            <Button variant="outline" onClick={runSearch} disabled={loading}>
-              {loading ? "Refreshing…" : "Refresh"}
+            <Button variant="outline" size="sm" onClick={runSearch} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing" : "Refresh"}
             </Button>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground">
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground">
             {errorMsg}
           </div>
         )}
 
         {loading && !hospitals.length && (
-          <div className="text-center text-muted-foreground py-16">
-            Locating specialty-matched hospitals…
+          <div className="flex flex-col items-center justify-center text-muted-foreground py-20">
+            <Loader2 className="h-6 w-6 animate-spin mb-3 text-primary" />
+            <div className="text-sm">Locating specialty-matched hospitals…</div>
           </div>
         )}
 
         {hospitals.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+            {/* List */}
+            <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1 -mr-1">
               {hospitals.map((h, i) => {
                 const eta = state.etas[h.id];
+                const isFastest = i === 0;
+                const matched = h.matchedKeywords.length > 0;
                 return (
-                  <Card
+                  <button
                     key={h.id}
-                    className="p-4 cursor-pointer hover:border-secondary transition"
                     onClick={() => choose(h)}
+                    className={`w-full text-left rounded-xl border bg-card transition-all hover:shadow-[var(--shadow-soft)] hover:border-primary/40 ${
+                      isFastest ? "border-primary/50 ring-1 ring-primary/20" : "border-border"
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-xs text-muted-foreground">
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Rank badge */}
+                        <div
+                          className={`shrink-0 h-10 w-10 rounded-lg flex flex-col items-center justify-center font-bold text-sm ${
+                            isFastest
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
                           #{i + 1}
-                          {i === 0 && eta && (
-                            <span className="ml-2 text-gold-foreground bg-gold px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                              Fastest
-                            </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-[15px] leading-tight truncate">
+                              {h.name}
+                            </h3>
+                            {isFastest && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                <Sparkles className="h-2.5 w-2.5" /> Fastest
+                              </span>
+                            )}
+                            {matched && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                                Match
+                              </span>
+                            )}
+                          </div>
+                          {h.address && (
+                            <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                              {h.address}
+                            </div>
                           )}
                         </div>
-                        <div className="font-display text-lg leading-tight mt-0.5">{h.name}</div>
-                        {h.address && (
-                          <div className="text-xs text-muted-foreground mt-1 break-words">
-                            {h.address}
-                          </div>
-                        )}
                       </div>
-                      {h.matchedKeywords.length > 0 && (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-gold text-gold-foreground whitespace-nowrap">
-                          Specialty match
-                        </span>
-                      )}
+
+                      {/* Metrics */}
+                      <div className="mt-3 flex items-center gap-4 pl-13">
+                        <div className="flex items-baseline gap-1">
+                          <Clock className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-lg font-bold text-foreground">
+                            {eta ? formatMin(eta.duration) : "—"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">min</span>
+                        </div>
+                        <div className="flex items-baseline gap-1">
+                          <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm font-semibold">
+                            {eta ? formatKm(eta.distance) : formatKm(h.distanceMeters)}
+                          </span>
+                        </div>
+                        <div className="ml-auto flex items-center gap-1.5">
+                          {h.emergency && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                              ER
+                            </span>
+                          )}
+                          {h.phone && (
+                            <a
+                              href={`tel:${h.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-border hover:bg-accent text-foreground"
+                              title={h.phone}
+                            >
+                              <Phone className="h-3 w-3" />
+                              Call
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`mt-3 inline-flex items-center gap-1.5 text-xs font-semibold ${
+                          isFastest ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        Select & view routes <ArrowRight className="h-3 w-3" />
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      {h.emergency && (
-                        <span className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-                          ER available
-                        </span>
-                      )}
-                      {h.phone && (
-                        <a
-                          href={`tel:${h.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-2 py-0.5 rounded border border-border hover:bg-accent"
-                        >
-                          📞 {h.phone}
-                        </a>
-                      )}
-                      <span className="text-muted-foreground ml-auto">
-                        {eta ? (
-                          <>
-                            🚑 {formatMin(eta.duration)} · {formatKm(eta.distance)} by road
-                          </>
-                        ) : (
-                          <>{formatKm(h.distanceMeters)} away</>
-                        )}
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        choose(h);
-                      }}
-                      className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      Select & view routes →
-                    </Button>
-                  </Card>
+                  </button>
                 );
               })}
             </div>
 
-            <div className="rounded-md overflow-hidden border border-border h-[600px]">
+            {/* Map */}
+            <div className="lg:sticky lg:top-20 self-start rounded-xl overflow-hidden border border-border shadow-[var(--shadow-card)] h-[640px] bg-card">
               <Suspense
                 fallback={
                   <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Loading map…
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                 }
               >

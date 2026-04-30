@@ -20,16 +20,20 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 const userIcon = L.divIcon({
   className: "",
-  html: `<div style="width:18px;height:18px;border-radius:50%;background:#c9a84c;border:3px solid #0c2340;box-shadow:0 0 0 3px rgba(201,168,76,0.35)"></div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  html: `<div style="position:relative;width:22px;height:22px;">
+    <div style="position:absolute;inset:-8px;border-radius:50%;background:rgba(37,99,235,0.18);animation:medroutePulse 2s ease-out infinite;"></div>
+    <div style="position:relative;width:22px;height:22px;border-radius:50%;background:#2563eb;border:3px solid #ffffff;box-shadow:0 2px 6px rgba(15,23,42,0.3);"></div>
+  </div>
+  <style>@keyframes medroutePulse{0%{transform:scale(0.6);opacity:0.7}100%{transform:scale(1.6);opacity:0}}</style>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
 });
 
 const hospitalIcon = L.divIcon({
   className: "",
-  html: `<div style="width:30px;height:30px;border-radius:6px;background:#0c2340;color:#f5f0e0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:2px solid #c9a84c;">+</div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
+  html: `<div style="width:32px;height:32px;border-radius:8px;background:#ffffff;color:#dc2626;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;border:2px solid #dc2626;box-shadow:0 2px 8px rgba(15,23,42,0.18);">+</div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 function FitBounds({ points }: { points: [number, number][] }) {
@@ -103,15 +107,15 @@ export function EmergencyMap({
           key={i}
           positions={r.coordinates}
           pathOptions={{
-            color: r.highlighted ? "#c9a84c" : "#5a7a9e",
+            color: r.highlighted ? "#2563eb" : "#94a3b8",
             weight: r.highlighted ? 6 : 4,
-            opacity: r.highlighted ? 0.95 : 0.55,
+            opacity: r.highlighted ? 0.95 : 0.6,
             dashArray: r.highlighted ? undefined : "8 6",
           }}
         />
       ))}
       {routeCoords && routeCoords.length > 1 && !alternativeRoutes && (
-        <Polyline positions={routeCoords} pathOptions={{ color: "#c9a84c", weight: 5, opacity: 0.9 }} />
+        <Polyline positions={routeCoords} pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.9 }} />
       )}
       <FitBounds points={fitPoints} />
     </MapContainer>
