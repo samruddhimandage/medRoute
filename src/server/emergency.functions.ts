@@ -219,7 +219,7 @@ export const getAlternativeRoutes = createServerFn({ method: "POST" })
               [data.to.lng, data.to.lat],
             ],
             instructions: false,
-            alternative_routes: { target_count: 3, share_factor: 0.6, weight_factor: 1.6 },
+            alternative_routes: { target_count: 3, share_factor: 0.5, weight_factor: 1.8 },
           }),
         }
       );
