@@ -241,17 +241,6 @@ function HospitalsPage() {
                               ER
                             </span>
                           )}
-                          {h.phone && (
-                            <a
-                              href={`tel:${h.phone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-border hover:bg-accent text-foreground"
-                              title={h.phone}
-                            >
-                              <Phone className="h-3 w-3" />
-                              Call
-                            </a>
-                          )}
                         </div>
                       </div>
 
