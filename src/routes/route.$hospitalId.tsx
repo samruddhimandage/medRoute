@@ -168,7 +168,7 @@ function RoutePage() {
               )}
 
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground pt-2 px-1">
-                {routes.length} route{routes.length === 1 ? "" : "s"} · sorted by time
+                Top {routes.length} fastest of all possible routes · all shown on map
               </div>
 
               {routes.map((r, i) => {

@@ -241,26 +241,37 @@ function HospitalsPage() {
                               ER
                             </span>
                           )}
-                          {h.phone && (
-                            <a
-                              href={`tel:${h.phone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-border hover:bg-accent text-foreground"
-                              title={h.phone}
-                            >
-                              <Phone className="h-3 w-3" />
-                              Call
-                            </a>
-                          )}
                         </div>
                       </div>
 
-                      <div
-                        className={`mt-3 inline-flex items-center gap-1.5 text-xs font-semibold ${
-                          isFastest ? "text-primary" : "text-muted-foreground"
-                        }`}
-                      >
-                        Select & view routes <ArrowRight className="h-3 w-3" />
+                      <div className="mt-3 flex items-center gap-2">
+                        {h.phone ? (
+                          <a
+                            href={`tel:${h.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 text-xs font-semibold transition"
+                            title={h.phone}
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                            Call ambulance
+                          </a>
+                        ) : (
+                          <a
+                            href="tel:102"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-3 py-1.5 text-xs font-semibold transition border border-destructive/20"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                            Call 102 ambulance
+                          </a>
+                        )}
+                        <span
+                          className={`ml-auto inline-flex items-center gap-1 text-xs font-semibold ${
+                            isFastest ? "text-primary" : "text-muted-foreground"
+                          }`}
+                        >
+                          Routes <ArrowRight className="h-3 w-3" />
+                        </span>
                       </div>
                     </div>
                   </button>

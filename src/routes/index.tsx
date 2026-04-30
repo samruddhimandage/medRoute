@@ -230,23 +230,6 @@ function HomePage() {
                   Set
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune"].map(
-                  (c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => {
-                        setManualAddress(c);
-                        submitManualAddress(c);
-                      }}
-                      className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-card hover:bg-accent hover:border-accent transition"
-                    >
-                      {c}
-                    </button>
-                  )
-                )}
-              </div>
             </div>
           </div>
 

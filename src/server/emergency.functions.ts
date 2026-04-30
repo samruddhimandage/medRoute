@@ -219,7 +219,7 @@ export const getAlternativeRoutes = createServerFn({ method: "POST" })
               [data.to.lng, data.to.lat],
             ],
             instructions: false,
-            alternative_routes: { target_count: 3, share_factor: 0.6, weight_factor: 1.6 },
+            alternative_routes: { target_count: 3, share_factor: 0.5, weight_factor: 1.8 },
           }),
         }
       );
@@ -256,9 +256,9 @@ export const getAlternativeRoutes = createServerFn({ method: "POST" })
         distanceMeters: f.properties?.summary?.distance ?? 0,
         durationSeconds: f.properties?.summary?.duration ?? 0,
       }));
-      // Sort by duration so shortest-by-time is first
+      // Sort by duration so shortest-by-time is first; cap at top 3 fastest
       routes.sort((a, b) => a.durationSeconds - b.durationSeconds);
-      return { routes, error: null as string | null };
+      return { routes: routes.slice(0, 3), error: null as string | null };
     } catch (e) {
       console.error("ORS alt fetch failed", e);
       return { routes: [] as RouteOption[], error: "Unable to compute routes." };
