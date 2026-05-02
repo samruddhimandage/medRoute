@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   RefreshCw,
@@ -10,6 +10,8 @@ import {
   Loader2,
   MapPin,
   Sparkles,
+  Ambulance,
+  WifiOff,
 } from "lucide-react";
 import { findNearbyHospitals, getRouteMatrix, type Hospital } from "@/server/emergency.functions";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,10 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState } from "@/lib/emergencyStore";
 import { SiteHeader } from "@/components/SiteHeader";
+import { useT } from "@/lib/i18n";
+import { useOnline } from "@/hooks/useOnline";
+import { saveHospitalCache, loadHospitalCache } from "@/lib/hospitalCache";
+import { withTraffic, ambulanceEta, trafficFactor } from "@/lib/traffic";
 
 const EmergencyMap = lazy(() => import("@/components/EmergencyMap"));
 
@@ -44,8 +50,13 @@ function formatMin(s: number) {
 function HospitalsPage() {
   const state = useEmergencyState();
   const navigate = useNavigate();
+  const t = useT();
+  const online = useOnline();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [usingCache, setUsingCache] = useState(false);
+  const [tick, setTick] = useState(0); // re-render every few seconds for live ETA
+  const lastRefresh = useRef<number>(Date.now());
 
   useEffect(() => {
     if (!state.location || !state.injury) {
@@ -57,10 +68,33 @@ function HospitalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live ETA tick — re-renders ETA every 5 seconds with new traffic factor
+  useEffect(() => {
+    const id = setInterval(() => setTick((x) => x + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+
   const runSearch = async () => {
     if (!state.location || !state.injury) return;
     setLoading(true);
     setErrorMsg(null);
+    setUsingCache(false);
+
+    // If offline, try cache first
+    if (!online) {
+      const cached = loadHospitalCache(state.location, state.injury.id);
+      if (cached && cached.length) {
+        emergencyStore.set({ hospitals: cached, etas: {} });
+        setUsingCache(true);
+        setErrorMsg(null);
+        setLoading(false);
+        return;
+      }
+      setErrorMsg(t("offline_banner"));
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await findNearbyHospitals({
         data: {
@@ -72,11 +106,23 @@ function HospitalsPage() {
       });
       if (res.error) setErrorMsg(res.error);
       if (!res.hospitals || res.hospitals.length === 0) {
-        setErrorMsg("No hospitals found nearby. Please try a different location.");
-        emergencyStore.set({ hospitals: [], etas: {} });
+        // Try cache as last resort
+        const cached = loadHospitalCache(state.location, state.injury.id);
+        if (cached && cached.length) {
+          emergencyStore.set({ hospitals: cached, etas: {} });
+          setUsingCache(true);
+        } else {
+          setErrorMsg("No hospitals found nearby. Please try a different location.");
+          emergencyStore.set({ hospitals: [], etas: {} });
+        }
         return;
       }
       emergencyStore.set({ hospitals: res.hospitals, etas: {} });
+      saveHospitalCache({
+        location: state.location,
+        injuryId: state.injury.id,
+        hospitals: res.hospitals,
+      });
 
       try {
         const mx = await getRouteMatrix({
@@ -92,13 +138,20 @@ function HospitalsPage() {
             map[h.id] = r ? { distance: r.distanceMeters, duration: r.durationSeconds } : null;
           });
           emergencyStore.set({ etas: map });
+          lastRefresh.current = Date.now();
         }
       } catch (e) {
         console.error("matrix failed", e);
       }
     } catch (e) {
       console.error("find hospitals failed", e);
-      setErrorMsg("Could not load hospitals. Please try again.");
+      const cached = loadHospitalCache(state.location, state.injury.id);
+      if (cached && cached.length) {
+        emergencyStore.set({ hospitals: cached, etas: {} });
+        setUsingCache(true);
+      } else {
+        setErrorMsg("Could not load hospitals. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +164,8 @@ function HospitalsPage() {
 
   if (!state.location || !state.injury) return null;
 
+  // Use traffic-adjusted duration for sorting & display
+  const factor = trafficFactor();
   const hospitals = [...(state.hospitals ?? [])].sort((a, b) => {
     const ea = state.etas[a.id]?.duration;
     const eb = state.etas[b.id]?.duration;
@@ -120,36 +175,47 @@ function HospitalsPage() {
     return a.distanceMeters - b.distanceMeters;
   });
 
+  void tick; // referenced to force re-render via dependency
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
-      <SiteHeader step={2} stepLabel="Hospitals" />
+      <SiteHeader step={2} stepLabel={t("step_hospitals")} />
 
       <section className="mx-auto max-w-6xl px-6 py-8">
         {/* Title bar */}
         <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 text-destructive px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
                 {state.injury.label}
               </span>
               <MapPin className="h-3 w-3" />
               <span className="truncate max-w-[260px]">{state.locationLabel}</span>
+              {usingCache && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
+                  <WifiOff className="h-2.5 w-2.5" /> {t("offline_short")}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                {t("live")}
+              </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Recommended hospitals
+              {t("recommended_hospitals")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Sorted by driving time · specialty-matched first
+              {t("sorted_by")}
             </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate({ to: "/" })}>
-              <ArrowLeft className="h-3.5 w-3.5" /> Back
+              <ArrowLeft className="h-3.5 w-3.5" /> {t("back")}
             </Button>
             <Button variant="outline" size="sm" onClick={runSearch} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "Refreshing" : "Refresh"}
+              {loading ? t("refreshing") : t("refresh")}
             </Button>
           </div>
         </div>
@@ -163,7 +229,7 @@ function HospitalsPage() {
         {loading && !hospitals.length && (
           <div className="flex flex-col items-center justify-center text-muted-foreground py-20">
             <Loader2 className="h-6 w-6 animate-spin mb-3 text-primary" />
-            <div className="text-sm">Locating specialty-matched hospitals…</div>
+            <div className="text-sm">{t("locating")}</div>
           </div>
         )}
 
@@ -175,6 +241,8 @@ function HospitalsPage() {
                 const eta = state.etas[h.id];
                 const isFastest = i === 0;
                 const matched = h.matchedKeywords.length > 0;
+                const liveCar = eta ? withTraffic(eta.duration) : null;
+                const liveAmb = eta ? ambulanceEta(eta.duration) : null;
                 return (
                   <button
                     key={h.id}
@@ -185,7 +253,6 @@ function HospitalsPage() {
                   >
                     <div className="p-4">
                       <div className="flex items-start gap-3">
-                        {/* Rank badge */}
                         <div
                           className={`shrink-0 h-10 w-10 rounded-lg flex flex-col items-center justify-center font-bold text-sm ${
                             isFastest
@@ -202,13 +269,13 @@ function HospitalsPage() {
                               {h.name}
                             </h3>
                             {isFastest && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                <Sparkles className="h-2.5 w-2.5" /> Fastest
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                                <Sparkles className="h-2.5 w-2.5" /> {t("fastest_now")}
                               </span>
                             )}
                             {matched && (
                               <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
-                                Match
+                                {t("match")}
                               </span>
                             )}
                           </div>
@@ -220,28 +287,43 @@ function HospitalsPage() {
                         </div>
                       </div>
 
-                      {/* Metrics */}
-                      <div className="mt-3 flex items-center gap-4 pl-13">
-                        <div className="flex items-baseline gap-1">
-                          <Clock className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-lg font-bold text-foreground">
-                            {eta ? formatMin(eta.duration) : "—"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">min</span>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                          <Navigation className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm font-semibold">
-                            {eta ? formatKm(eta.distance) : formatKm(h.distanceMeters)}
-                          </span>
-                        </div>
-                        <div className="ml-auto flex items-center gap-1.5">
-                          {h.emergency && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
-                              ER
+                      {/* Live ETAs */}
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-muted/50 px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> 🚗 {t("car_eta")}
+                          </div>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-lg font-bold text-foreground">
+                              {liveCar != null ? formatMin(liveCar) : "—"}
                             </span>
-                          )}
+                            <span className="text-[11px] text-muted-foreground">{t("min")}</span>
+                          </div>
                         </div>
+                        <div className="rounded-lg bg-destructive/5 px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-destructive flex items-center gap-1">
+                            <Ambulance className="h-3 w-3" /> 🚑 {t("ambulance_eta")}
+                          </div>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-lg font-bold text-foreground">
+                              {liveAmb != null ? formatMin(liveAmb) : "—"}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">{t("min")}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <Navigation className="h-3 w-3" />
+                          {eta ? formatKm(eta.distance) : formatKm(h.distanceMeters)}
+                        </span>
+                        {h.emergency && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                            ER
+                          </span>
+                        )}
+                        <span className="ml-auto">×{factor.toFixed(2)} traffic</span>
                       </div>
 
                       <div className="mt-3 flex items-center gap-2">
@@ -253,7 +335,7 @@ function HospitalsPage() {
                             title={h.phone}
                           >
                             <Phone className="h-3.5 w-3.5" />
-                            Call ambulance
+                            {t("call_ambulance")}
                           </a>
                         ) : (
                           <a
@@ -262,7 +344,7 @@ function HospitalsPage() {
                             className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-3 py-1.5 text-xs font-semibold transition border border-destructive/20"
                           >
                             <Phone className="h-3.5 w-3.5" />
-                            Call 102 ambulance
+                            {t("call_102")}
                           </a>
                         )}
                         <span
@@ -270,7 +352,7 @@ function HospitalsPage() {
                             isFastest ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
-                          Routes <ArrowRight className="h-3 w-3" />
+                          {t("routes")} <ArrowRight className="h-3 w-3" />
                         </span>
                       </div>
                     </div>
