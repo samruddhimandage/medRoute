@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState, type Coords } from "@/lib/emergencyStore";
 import { SiteHeader } from "@/components/SiteHeader";
+import { VoiceInput } from "@/components/VoiceInput";
+import { useT, translateInjury, useLang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -61,6 +63,8 @@ const ICON_MAP: Record<InjuryType["icon"], LucideIcon> = {
 function HomePage() {
   const navigate = useNavigate();
   const stored = useEmergencyState();
+  const t = useT();
+  const lang = useLang();
 
   const [location, setLocation] = useState<Coords | null>(stored.location);
   const [locationLabel, setLocationLabel] = useState<string>(stored.locationLabel);
@@ -157,21 +161,20 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
-      <SiteHeader step={1} stepLabel="Triage" />
+      <SiteHeader step={1} stepLabel={t("step_triage")} />
 
       {/* Hero */}
       <section className="border-b border-border">
         <div className="mx-auto max-w-6xl px-6 pt-12 pb-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/60 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-[--gold]" />
-            Step 1 of 3
+            {t("step_of")}
           </div>
           <h1 className="mt-5 text-3xl md:text-4xl font-semibold tracking-tight max-w-2xl">
-            Get to the right hospital, fast.
+            {t("hero_title")}
           </h1>
           <p className="mt-3 max-w-xl text-[15px] text-muted-foreground">
-            Set your location and the type of emergency. We'll match you with
-            the nearest qualified hospital and the fastest ambulance route.
+            {t("hero_sub")}
           </p>
           <div className="gold-rule mt-6" />
         </div>
@@ -184,7 +187,7 @@ function HomePage() {
             <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
               1
             </div>
-            <h2 className="text-xl font-semibold">Your location</h2>
+            <h2 className="text-xl font-semibold">{t("your_location")}</h2>
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
@@ -196,23 +199,23 @@ function HomePage() {
                 className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
               >
                 <Locate className="h-4 w-4" />
-                {loading ? "Detecting…" : "Detect my location"}
+                {loading ? t("detecting") : t("detect_location")}
               </Button>
               <p className="mt-2 text-xs text-muted-foreground text-center">
-                Uses your device GPS · permission required
+                {t("detect_hint")}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="addr" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Or enter manually
+                {t("enter_manually")}
               </Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="addr"
-                    placeholder="City, address or landmark"
+                    placeholder={t("addr_placeholder")}
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
@@ -227,7 +230,7 @@ function HomePage() {
                   size="lg"
                   className="h-12"
                 >
-                  Set
+                  {t("set")}
                 </Button>
               </div>
             </div>
@@ -237,7 +240,7 @@ function HomePage() {
             <div className="mt-5 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm flex gap-3">
               <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-destructive">Location unavailable</div>
+                <div className="font-medium text-destructive">{t("location_unavailable")}</div>
                 <p className="text-muted-foreground mt-0.5">{locationError}</p>
               </div>
             </div>
@@ -248,7 +251,7 @@ function HomePage() {
               <CheckCircle2 className="h-4 w-4 text-[--gold] shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Location confirmed
+                  {t("location_confirmed")}
                 </div>
                 <div className="font-medium truncate">{locationLabel}</div>
                 <div className="text-xs text-muted-foreground mt-0.5 font-mono">
@@ -261,23 +264,27 @@ function HomePage() {
 
         {/* Step 2 — Emergency */}
         <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-6 md:p-8">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
-              2
+          <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
+                2
+              </div>
+              <h2 className="text-xl font-semibold">{t("nature")}</h2>
             </div>
-            <h2 className="text-xl font-semibold">Nature of emergency</h2>
+            <VoiceInput onMatch={(id) => setInjuryId(id)} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {INJURY_TYPES.map((t) => {
-              const Icon = ICON_MAP[t.icon];
-              const active = t.id === injuryId;
-              const critical = t.severity === "critical";
+            {INJURY_TYPES.map((tp) => {
+              const Icon = ICON_MAP[tp.icon];
+              const active = tp.id === injuryId;
+              const critical = tp.severity === "critical";
+              const localLabel = translateInjury(tp.id, lang) ?? tp.label;
               return (
                 <button
-                  key={t.id}
+                  key={tp.id}
                   type="button"
-                  onClick={() => setInjuryId(t.id)}
+                  onClick={() => setInjuryId(tp.id)}
                   className={`group relative text-left rounded-xl border p-4 transition-all ${
                     active
                       ? "border-primary bg-primary/[0.04] ring-2 ring-primary/30 shadow-sm"
@@ -287,7 +294,7 @@ function HomePage() {
                   {critical && (
                     <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-destructive">
                       <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                      Critical
+                      {t("critical")}
                     </span>
                   )}
                   <div
@@ -301,9 +308,9 @@ function HomePage() {
                   >
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div className="font-semibold text-sm leading-tight">{t.label}</div>
+                  <div className="font-semibold text-sm leading-tight">{localLabel}</div>
                   <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                    {t.description}
+                    {tp.description}
                   </p>
                 </button>
               );
@@ -318,10 +325,10 @@ function HomePage() {
               <div className={`h-2 w-2 rounded-full ${ready ? "bg-[--gold]" : "bg-muted-foreground/30"}`} />
               <div>
                 <div className="font-medium">
-                  {ready ? "Ready to find care" : "Complete both steps to continue"}
+                  {ready ? t("ready") : t("complete_steps")}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {location ? "✓ Location" : "○ Location"} · {injury ? `✓ ${injury.label}` : "○ Emergency type"}
+                  {location ? "✓" : "○"} {t("your_location")} · {injury ? `✓ ${translateInjury(injury.id, lang) ?? injury.label}` : `○ ${t("nature")}`}
                 </div>
               </div>
             </div>
@@ -331,7 +338,7 @@ function HomePage() {
               size="lg"
               className="w-full sm:w-auto h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold disabled:opacity-50"
             >
-              {loading ? "Please wait…" : "Find care now"}
+              {loading ? t("please_wait") : t("find_care")}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

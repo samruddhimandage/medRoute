@@ -1,17 +1,21 @@
 import { Link } from "@tanstack/react-router";
 import { Phone, Plus, X } from "lucide-react";
 import { useState } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   step?: 1 | 2 | 3;
   stepLabel?: string;
 };
 
-const STEPS = ["Triage", "Hospitals", "Route"];
-
 export function SiteHeader({ step, stepLabel }: Props) {
+  const t = useT();
   const [showCall, setShowCall] = useState(false);
+  const STEPS = [t("step_triage"), t("step_hospitals"), t("step_route")];
   return (
+    <>
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2.5 group">
@@ -20,10 +24,10 @@ export function SiteHeader({ step, stepLabel }: Props) {
           </div>
           <div className="leading-tight">
             <div className="text-[15px] font-semibold tracking-tight text-foreground">
-              MedRoute
+              {t("brand")}
             </div>
             <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Emergency Response
+              {t("brand_sub")}
             </div>
           </div>
         </Link>
@@ -35,7 +39,7 @@ export function SiteHeader({ step, stepLabel }: Props) {
               const active = n === step;
               const done = n < step;
               return (
-                <div key={s} className="flex items-center gap-1.5">
+                <div key={i} className="flex items-center gap-1.5">
                   <div
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition ${
                       active
@@ -65,15 +69,18 @@ export function SiteHeader({ step, stepLabel }: Props) {
           </nav>
         )}
 
-        <button
-          type="button"
-          onClick={() => setShowCall(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 hover:bg-destructive hover:text-destructive-foreground text-destructive px-3 py-1.5 text-sm font-semibold transition border border-destructive/20"
-        >
-          <Phone className="h-3.5 w-3.5" />
-          112
-          <span className="hidden sm:inline text-xs opacity-70 font-normal">/ 911</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <button
+            type="button"
+            onClick={() => setShowCall(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 hover:bg-destructive hover:text-destructive-foreground text-destructive px-3 py-1.5 text-sm font-semibold transition border border-destructive/20"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            112
+            <span className="hidden sm:inline text-xs opacity-70 font-normal">/ 911</span>
+          </button>
+        </div>
       </div>
 
       {showCall && (
@@ -88,11 +95,11 @@ export function SiteHeader({ step, stepLabel }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-destructive font-semibold">
-                  Emergency
+                  {t("step_triage") /* reuse */ === t("step_triage") ? "Emergency" : "Emergency"}
                 </div>
-                <h2 className="mt-1 text-lg font-semibold tracking-tight">Call emergency services?</h2>
+                <h2 className="mt-1 text-lg font-semibold tracking-tight">{t("call_emergency")}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This will dial the local emergency number on your device.
+                  {t("call_emergency_sub")}
                 </p>
               </div>
               <button
@@ -111,7 +118,7 @@ export function SiteHeader({ step, stepLabel }: Props) {
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-3 text-base font-semibold transition"
               >
                 <Phone className="h-4 w-4" />
-                Call 112
+                {t("call_112")}
               </a>
               <a
                 href="tel:911"
@@ -119,20 +126,22 @@ export function SiteHeader({ step, stepLabel }: Props) {
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-border hover:bg-accent px-4 py-3 text-sm font-semibold transition"
               >
                 <Phone className="h-4 w-4" />
-                Call 911
+                {t("call_911")}
               </a>
               <button
                 type="button"
                 onClick={() => setShowCall(false)}
                 className="text-xs text-muted-foreground hover:text-foreground mt-1 py-1"
               >
-                Cancel
+                {t("cancel")}
               </button>
             </div>
           </div>
         </div>
       )}
     </header>
+    <OfflineBanner />
+    </>
   );
 }
 
