@@ -177,12 +177,34 @@ function HospitalsPage() {
 
   void tick; // referenced to force re-render via dependency
 
+  // Emergency Mode auto-route to fastest once ETAs are in
+  const autoRoutedRef = useRef(false);
+  useEffect(() => {
+    if (autoRoutedRef.current) return;
+    if (!state.emergencyMode) return;
+    if (!hospitals.length) return;
+    const top = hospitals[0];
+    if (state.etas[top.id] == null) return;
+    autoRoutedRef.current = true;
+    toast.success(t("auto_routing"));
+    const id = setTimeout(() => choose(top), 700);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hospitals.length, state.etas, state.emergencyMode]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toaster richColors position="top-center" />
       <SiteHeader step={2} stepLabel={t("step_hospitals")} />
 
       <section className="mx-auto max-w-6xl px-6 py-8">
+        {hospitals.length > 0 && (
+          <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3 text-sm flex items-start gap-3">
+            <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="text-foreground">{t("reassure_hospitals")}</div>
+          </div>
+        )}
+
         {/* Title bar */}
         <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
           <div className="min-w-0">
@@ -201,6 +223,11 @@ function HospitalsPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                 {t("live")}
               </span>
+              {state.emergencyMode && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-destructive text-destructive-foreground px-2 py-0.5 font-bold uppercase tracking-wider text-[10px]">
+                  ⚡ {t("emergency_mode")}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
               {t("recommended_hospitals")}
