@@ -82,6 +82,26 @@ const en: Dict = {
 
   offline_banner: "Limited connectivity – showing cached results.",
   offline_short: "Offline",
+
+  // Redesign — emergency-grade UX
+  reassure_hero: "Stay calm. We're finding the fastest help for you.",
+  reassure_hospitals: "You're on the right path. The closest qualified hospital is highlighted below.",
+  emergency_mode: "Emergency Mode",
+  emergency_mode_on: "ON · Auto-route to fastest hospital",
+  emergency_mode_off: "Off · You choose the hospital",
+  common_emergencies: "Most common emergencies",
+  more_emergencies: "More emergency types",
+  show_more: "Show all",
+  show_less: "Show fewer",
+  not_sure: "I don't know",
+  not_sure_sub: "Send me to the nearest ER",
+  speak_instead: "Or describe what's happening — tap and speak",
+  call_112_now: "Call 112",
+  go_here_now: "Go here now",
+  primary_pick: "Best choice for you",
+  why_picked: "Closest hospital matched to your emergency, with the fastest live ETA.",
+  auto_routing: "Emergency Mode on — taking you to the fastest hospital…",
+  detecting_auto: "Detecting your location…",
 };
 
 // For non-English we translate the most user-facing strings; remaining keys fall back to English.

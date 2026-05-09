@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapPin,
   Locate,
@@ -15,6 +15,11 @@ import {
   Baby,
   Stethoscope,
   Plus,
+  Phone,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { geocodeAddress } from "@/server/emergency.functions";
@@ -49,16 +54,11 @@ export const Route = createFileRoute("/")({
 });
 
 const ICON_MAP: Record<InjuryType["icon"], LucideIcon> = {
-  Brain,
-  HeartPulse,
-  Droplet,
-  Bone,
-  Flame,
-  Wind,
-  Baby,
-  Stethoscope,
-  Plus,
+  Brain, HeartPulse, Droplet, Bone, Flame, Wind, Baby, Stethoscope, Plus,
 };
+
+// Top 3 most common life-threatening emergencies — surfaced first.
+const PRIORITY_IDS = ["cardiac", "bleeding", "respiratory"];
 
 function HomePage() {
   const navigate = useNavigate();
@@ -71,70 +71,76 @@ function HomePage() {
   const [manualAddress, setManualAddress] = useState("");
   const [injuryId, setInjuryId] = useState<string>(stored.injury?.id ?? "");
   const [loading, setLoading] = useState(false);
+  const [autoDetecting, setAutoDetecting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [emergencyMode, setEmergencyMode] = useState<boolean>(stored.emergencyMode);
+  const autoTried = useRef(false);
 
   const injury = useMemo(() => INJURY_TYPES.find((i) => i.id === injuryId), [injuryId]);
 
-  const detectLocation = useCallback(() => {
+  const detectLocation = useCallback((silent = false) => {
     setLocationError(null);
     if (!("geolocation" in navigator)) {
-      const m = "Geolocation is not supported by your browser. Please enter your address manually.";
+      const m = "Geolocation is not supported. Please enter your address manually.";
       setLocationError(m);
-      toast.error(m);
+      if (!silent) toast.error(m);
+      setAutoDetecting(false);
       return;
     }
-    setLoading(true);
+    if (silent) setAutoDetecting(true);
+    else setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocationLabel("Detected current location");
         setLoading(false);
+        setAutoDetecting(false);
         setLocationError(null);
-        toast.success("Location detected.");
+        if (!silent) toast.success("Location detected.");
       },
       (err) => {
         setLoading(false);
-        const inIframe = window.self !== window.top;
+        setAutoDetecting(false);
+        const inIframe = typeof window !== "undefined" && window.self !== window.top;
         let msg = "";
         if (err.code === 1) {
           msg = inIframe
             ? "Location is blocked inside the preview. Open in a new tab, or type your city below."
-            : "Permission denied. Allow access in browser settings, or enter your city below.";
-        } else if (err.code === 2) {
-          msg = "Position unavailable. Please type your city or address below.";
-        } else if (err.code === 3) {
-          msg = "Location request timed out. Please type your city or address below.";
-        } else {
-          msg = err.message || "Could not detect location. Please enter your address manually.";
-        }
+            : "Permission denied. Allow access, or enter your city below.";
+        } else if (err.code === 2) msg = "Position unavailable. Please type your city below.";
+        else if (err.code === 3) msg = "Location request timed out. Please type your city below.";
+        else msg = err.message || "Could not detect location.";
         setLocationError(msg);
-        toast.error(msg);
+        if (!silent) toast.error(msg);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
 
+  // Auto-detect on mount (silent — no toast spam if blocked)
+  useEffect(() => {
+    if (autoTried.current) return;
+    autoTried.current = true;
+    if (!location) detectLocation(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submitManualAddress = useCallback(
     async (override?: string) => {
       const q = (override ?? manualAddress).trim();
-      if (q.length < 2) {
-        toast.error("Enter a city, address or landmark.");
-        return;
-      }
+      if (q.length < 2) return toast.error("Enter a city, address or landmark.");
       setLoading(true);
       try {
         const res = await geocodeAddress({ data: { query: q } });
-        if (res.error || !res.result) {
-          toast.error(res.error || "Could not find that location.");
-          return;
-        }
+        if (res.error || !res.result) return toast.error(res.error || "Could not find that location.");
         setLocation({ lat: res.result.lat, lng: res.result.lng });
         setLocationLabel(res.result.label);
         setLocationError(null);
         toast.success("Location set.");
       } catch (e) {
-        console.error("geocode failed", e);
-        toast.error("Geocoding service unreachable. Please try again.");
+        console.error(e);
+        toast.error("Geocoding service unreachable.");
       } finally {
         setLoading(false);
       }
@@ -142,208 +148,325 @@ function HomePage() {
     [manualAddress]
   );
 
-  const handleSearch = useCallback(() => {
-    if (!location) return toast.error("Please set your location first.");
-    if (!injury) return toast.error("Please select the type of emergency.");
-    emergencyStore.set({
-      location,
-      locationLabel,
-      injury,
-      hospitals: null,
-      etas: {},
-      selectedHospital: null,
-    });
-    navigate({ to: "/hospitals" });
-  }, [location, locationLabel, injury, navigate]);
+  const handleSearch = useCallback(
+    (overrideInjuryId?: string) => {
+      const finalInjury = overrideInjuryId
+        ? INJURY_TYPES.find((i) => i.id === overrideInjuryId) ?? null
+        : injury;
+      if (!location) return toast.error("Please set your location first.");
+      if (!finalInjury) return toast.error("Please tell us the type of emergency, or tap 'I don't know'.");
+      emergencyStore.set({
+        location,
+        locationLabel,
+        injury: finalInjury,
+        hospitals: null,
+        etas: {},
+        selectedHospital: null,
+        emergencyMode,
+      });
+      navigate({ to: "/hospitals" });
+    },
+    [location, locationLabel, injury, emergencyMode, navigate]
+  );
+
+  const handleNotSure = useCallback(() => {
+    setInjuryId("general");
+    handleSearch("general");
+  }, [handleSearch]);
 
   const ready = !!location && !!injury;
 
+  const priority = INJURY_TYPES.filter((i) => PRIORITY_IDS.includes(i.id))
+    .sort((a, b) => PRIORITY_IDS.indexOf(a.id) - PRIORITY_IDS.indexOf(b.id));
+  const rest = INJURY_TYPES.filter((i) => !PRIORITY_IDS.includes(i.id));
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground pb-32">
       <Toaster richColors position="top-center" />
       <SiteHeader step={1} stepLabel={t("step_triage")} />
 
-      {/* Hero */}
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-6 pt-12 pb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/60 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-[--gold]" />
+      {/* Sticky top action bar — always visible during stress */}
+      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto max-w-6xl px-4 md:px-6 py-2.5 flex items-center gap-2">
+          <a
+            href="tel:112"
+            className="inline-flex items-center gap-2 rounded-lg bg-destructive text-destructive-foreground px-3 py-2 text-sm font-bold hover:opacity-90 active:scale-[0.98] transition shadow-sm"
+            aria-label="Call emergency 112"
+          >
+            <Phone className="h-4 w-4" />
+            {t("call_112_now")}
+          </a>
+          <button
+            type="button"
+            onClick={() => setEmergencyMode((v) => !v)}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold border transition active:scale-[0.98] ${
+              emergencyMode
+                ? "bg-destructive/10 text-destructive border-destructive/40"
+                : "bg-card text-foreground border-border hover:border-primary/40"
+            }`}
+            aria-pressed={emergencyMode}
+            title={emergencyMode ? t("emergency_mode_on") : t("emergency_mode_off")}
+          >
+            <Zap className={`h-4 w-4 ${emergencyMode ? "fill-destructive" : ""}`} />
+            {t("emergency_mode")}
+            <span className={`ml-1 text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 ${
+              emergencyMode ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
+            }`}>{emergencyMode ? "ON" : "OFF"}</span>
+          </button>
+          <div className="ml-auto hidden md:block text-xs text-muted-foreground truncate max-w-[300px]">
+            {location ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {locationLabel}
+              </span>
+            ) : autoDetecting ? (
+              t("detecting_auto")
+            ) : (
+              "No location set"
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Reassurance hero */}
+      <section className="border-b border-border bg-gradient-to-b from-accent/30 to-transparent">
+        <div className="mx-auto max-w-6xl px-6 pt-10 pb-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t("step_of")}
           </div>
           <h1 className="mt-5 text-3xl md:text-4xl font-semibold tracking-tight max-w-2xl">
             {t("hero_title")}
           </h1>
           <p className="mt-3 max-w-xl text-[15px] text-muted-foreground">
-            {t("hero_sub")}
+            {t("reassure_hero")}
           </p>
           <div className="gold-rule mt-6" />
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-10 space-y-8">
-        {/* Step 1 — Location */}
-        <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-6 md:p-8">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
-              1
-            </div>
-            <h2 className="text-xl font-semibold">{t("your_location")}</h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-5">
-            <div>
-              <Button
-                onClick={detectLocation}
-                disabled={loading}
-                size="lg"
-                className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              >
-                <Locate className="h-4 w-4" />
-                {loading ? t("detecting") : t("detect_location")}
-              </Button>
-              <p className="mt-2 text-xs text-muted-foreground text-center">
-                {t("detect_hint")}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="addr" className="text-xs uppercase tracking-wider text-muted-foreground">
-                {t("enter_manually")}
-              </Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="addr"
-                    placeholder={t("addr_placeholder")}
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
-                    className="h-12 pl-9"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  onClick={() => submitManualAddress()}
-                  disabled={loading}
-                  variant="outline"
-                  size="lg"
-                  className="h-12"
-                >
-                  {t("set")}
-                </Button>
+      <section className="mx-auto max-w-6xl px-4 md:px-6 py-8 space-y-6">
+        {/* Step 1 — Location (collapsed when set) */}
+        <div className={`rounded-2xl border bg-card shadow-[var(--shadow-card)] p-5 md:p-6 transition ${
+          location ? "border-emerald-500/30" : "border-border"
+        }`}>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className={`h-8 w-8 rounded-full text-sm font-semibold flex items-center justify-center ${
+                location ? "bg-emerald-500 text-white" : "bg-primary text-primary-foreground"
+              }`}>
+                {location ? <CheckCircle2 className="h-4 w-4" /> : "1"}
               </div>
+              <h2 className="text-lg md:text-xl font-semibold">{t("your_location")}</h2>
             </div>
+            {location && (
+              <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                {locationLabel}
+              </div>
+            )}
           </div>
 
-          {locationError && !location && (
-            <div className="mt-5 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm flex gap-3">
-              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          {!location && (
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <div className="font-medium text-destructive">{t("location_unavailable")}</div>
-                <p className="text-muted-foreground mt-0.5">{locationError}</p>
+                <Button
+                  onClick={() => detectLocation(false)}
+                  disabled={loading || autoDetecting}
+                  size="lg"
+                  className="w-full h-14 text-base bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+                >
+                  <Locate className="h-5 w-5" />
+                  {autoDetecting || loading ? t("detecting") : t("detect_location")}
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground text-center">{t("detect_hint")}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="addr" className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {t("enter_manually")}
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="addr"
+                      placeholder={t("addr_placeholder")}
+                      value={manualAddress}
+                      onChange={(e) => setManualAddress(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && submitManualAddress()}
+                      className="h-14 pl-9 text-base"
+                    />
+                  </div>
+                  <Button type="button" onClick={() => submitManualAddress()} disabled={loading} variant="outline" size="lg" className="h-14">
+                    {t("set")}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
           {location && (
-            <div className="mt-5 rounded-lg border border-[--gold]/30 bg-accent/40 p-4 text-sm flex gap-3">
-              <CheckCircle2 className="h-4 w-4 text-[--gold] shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  {t("location_confirmed")}
-                </div>
-                <div className="font-medium truncate">{locationLabel}</div>
-                <div className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </div>
-              </div>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-muted-foreground font-mono text-xs">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+              </span>
+              <button
+                onClick={() => { setLocation(null); setLocationLabel(""); }}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Change
+              </button>
+            </div>
+          )}
+
+          {locationError && !location && (
+            <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm flex gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div className="text-muted-foreground">{locationError}</div>
             </div>
           )}
         </div>
 
-        {/* Step 2 — Emergency */}
-        <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-6 md:p-8">
-          <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+        {/* Step 2 — Triage */}
+        <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-5 md:p-6">
+          <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center">
-                2
+              <div className={`h-8 w-8 rounded-full text-sm font-semibold flex items-center justify-center ${
+                injury ? "bg-emerald-500 text-white" : "bg-primary text-primary-foreground"
+              }`}>
+                {injury ? <CheckCircle2 className="h-4 w-4" /> : "2"}
               </div>
-              <h2 className="text-xl font-semibold">{t("nature")}</h2>
+              <h2 className="text-lg md:text-xl font-semibold">{t("nature")}</h2>
             </div>
+          </div>
+          <p className="text-sm text-muted-foreground ml-11 mb-4">{t("speak_instead")}</p>
+
+          {/* Voice — primary input */}
+          <div className="ml-11 mb-5">
             <VoiceInput onMatch={(id) => setInjuryId(id)} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {INJURY_TYPES.map((tp) => {
+          {/* Top 3 + I don't know */}
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2 ml-11">
+            {t("common_emergencies")}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {priority.map((tp) => {
               const Icon = ICON_MAP[tp.icon];
               const active = tp.id === injuryId;
-              const critical = tp.severity === "critical";
               const localLabel = translateInjury(tp.id, lang) ?? tp.label;
               return (
                 <button
                   key={tp.id}
                   type="button"
                   onClick={() => setInjuryId(tp.id)}
-                  className={`group relative text-left rounded-xl border p-4 transition-all ${
+                  className={`relative text-left rounded-xl border-2 p-4 transition-all active:scale-[0.98] min-h-[112px] ${
                     active
-                      ? "border-primary bg-primary/[0.04] ring-2 ring-primary/30 shadow-sm"
-                      : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+                      ? "border-primary bg-primary/[0.05] ring-2 ring-primary/30"
+                      : "border-border bg-card hover:border-destructive/40 hover:shadow-md"
                   }`}
                 >
-                  {critical && (
-                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-destructive">
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                      {t("critical")}
-                    </span>
-                  )}
-                  <div
-                    className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 transition ${
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : critical
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-accent text-accent-foreground"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
+                  <div className={`h-11 w-11 rounded-lg flex items-center justify-center mb-3 ${
+                    active ? "bg-primary text-primary-foreground" : "bg-destructive/10 text-destructive"
+                  }`}>
+                    <Icon className="h-6 w-6" />
                   </div>
-                  <div className="font-semibold text-sm leading-tight">{localLabel}</div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                    {tp.description}
-                  </p>
+                  <div className="font-semibold text-base leading-tight">{localLabel}</div>
                 </button>
               );
             })}
-          </div>
-        </div>
 
-        {/* CTA bar */}
-        <div className="sticky bottom-4 z-20">
-          <div className="rounded-2xl border border-border bg-card/95 backdrop-blur shadow-[var(--shadow-elevated)] p-4 md:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 text-sm">
-              <div className={`h-2 w-2 rounded-full ${ready ? "bg-[--gold]" : "bg-muted-foreground/30"}`} />
-              <div>
-                <div className="font-medium">
-                  {ready ? t("ready") : t("complete_steps")}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {location ? "✓" : "○"} {t("your_location")} · {injury ? `✓ ${translateInjury(injury.id, lang) ?? injury.label}` : `○ ${t("nature")}`}
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={handleSearch}
-              disabled={loading || !ready}
-              size="lg"
-              className="w-full sm:w-auto h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold disabled:opacity-50"
+            {/* "I don't know" — instant escape hatch */}
+            <button
+              type="button"
+              onClick={handleNotSure}
+              disabled={!location}
+              className="relative text-left rounded-xl border-2 border-dashed border-primary/40 bg-accent/40 p-4 transition-all hover:bg-accent active:scale-[0.98] min-h-[112px] disabled:opacity-50"
             >
-              {loading ? t("please_wait") : t("find_care")}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+              <div className="h-11 w-11 rounded-lg flex items-center justify-center mb-3 bg-primary text-primary-foreground">
+                <HelpCircle className="h-6 w-6" />
+              </div>
+              <div className="font-semibold text-base leading-tight">{t("not_sure")}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{t("not_sure_sub")}</div>
+            </button>
           </div>
+
+          {/* Show more */}
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="mt-5 inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+          >
+            {showAll ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showAll ? t("show_less") : t("more_emergencies")}
+          </button>
+
+          {showAll && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {rest.map((tp) => {
+                const Icon = ICON_MAP[tp.icon];
+                const active = tp.id === injuryId;
+                const localLabel = translateInjury(tp.id, lang) ?? tp.label;
+                return (
+                  <button
+                    key={tp.id}
+                    type="button"
+                    onClick={() => setInjuryId(tp.id)}
+                    className={`text-left rounded-lg border p-3 transition active:scale-[0.98] ${
+                      active
+                        ? "border-primary bg-primary/[0.04] ring-1 ring-primary/30"
+                        : "border-border bg-card hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-8 w-8 rounded-md flex items-center justify-center ${
+                        active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="font-medium text-sm leading-tight">{localLabel}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
+
+      {/* Sticky bottom CTA — impossible to miss */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">
+        <div className="mx-auto max-w-6xl px-4 md:px-6 py-3 flex items-center gap-3">
+          <div className="hidden sm:flex flex-col text-xs">
+            <span className="font-semibold text-foreground">
+              {ready ? t("ready") : t("complete_steps")}
+            </span>
+            <span className="text-muted-foreground">
+              {location ? "✓" : "○"} location · {injury ? `✓ ${translateInjury(injury.id, lang) ?? injury.label}` : `○ emergency`}
+            </span>
+          </div>
+          <a
+            href="tel:112"
+            className="sm:ml-auto inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 h-14 text-sm font-semibold transition active:scale-[0.98]"
+          >
+            <Phone className="h-4 w-4" />
+            <span className="hidden sm:inline">Call 112</span>
+          </a>
+          <Button
+            onClick={() => handleSearch()}
+            disabled={loading || !ready}
+            size="lg"
+            className={`flex-1 sm:flex-none sm:min-w-[260px] h-14 px-6 text-base font-bold transition active:scale-[0.98] ${
+              ready
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {loading ? t("please_wait") : t("find_care")}
+            <ArrowRight className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
