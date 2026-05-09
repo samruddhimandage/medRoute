@@ -11,6 +11,7 @@ export type EmergencyState = {
   hospitals: Hospital[] | null;
   etas: Record<string, { distance: number; duration: number } | null>;
   selectedHospital: Hospital | null;
+  emergencyMode: boolean;
 };
 
 const STORAGE_KEY = "medroute:state:v1";
@@ -22,6 +23,7 @@ const initial: EmergencyState = {
   hospitals: null,
   etas: {},
   selectedHospital: null,
+  emergencyMode: false,
 };
 
 function load(): EmergencyState {
