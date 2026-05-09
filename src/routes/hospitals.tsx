@@ -271,19 +271,30 @@ function HospitalsPage() {
                 const liveCar = eta ? withTraffic(eta.duration) : null;
                 const liveAmb = eta ? ambulanceEta(eta.duration) : null;
                 return (
-                  <button
+                  <div
                     key={h.id}
-                    onClick={() => choose(h)}
-                    className={`w-full text-left rounded-xl border bg-card transition-all hover:shadow-[var(--shadow-soft)] hover:border-primary/40 ${
-                      isFastest ? "border-primary/50 ring-1 ring-primary/20" : "border-border"
+                    className={`w-full text-left rounded-xl border bg-card transition-all ${
+                      isFastest
+                        ? "border-destructive/50 ring-2 ring-destructive/30 shadow-[var(--shadow-elevated)]"
+                        : "border-border hover:shadow-[var(--shadow-soft)] hover:border-primary/40"
                     }`}
                   >
-                    <div className="p-4">
+                    {isFastest && (
+                      <div className="px-4 pt-3 pb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-destructive">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {t("primary_pick")}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => choose(h)}
+                      className="w-full text-left p-4 pt-2"
+                    >
                       <div className="flex items-start gap-3">
                         <div
                           className={`shrink-0 h-10 w-10 rounded-lg flex flex-col items-center justify-center font-bold text-sm ${
                             isFastest
-                              ? "bg-primary text-primary-foreground"
+                              ? "bg-destructive text-destructive-foreground"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
@@ -296,8 +307,8 @@ function HospitalsPage() {
                               {h.name}
                             </h3>
                             {isFastest && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-                                <Sparkles className="h-2.5 w-2.5" /> {t("fastest_now")}
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground">
+                                {t("fastest_now")}
                               </span>
                             )}
                             {matched && (
@@ -310,6 +321,9 @@ function HospitalsPage() {
                             <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
                               {h.address}
                             </div>
+                          )}
+                          {isFastest && (
+                            <p className="text-xs text-muted-foreground mt-1.5">{t("why_picked")}</p>
                           )}
                         </div>
                       </div>
@@ -352,38 +366,41 @@ function HospitalsPage() {
                         )}
                         <span className="ml-auto">×{factor.toFixed(2)} traffic</span>
                       </div>
+                    </button>
 
-                      <div className="mt-3 flex items-center gap-2">
-                        {h.phone ? (
-                          <a
-                            href={`tel:${h.phone}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 text-xs font-semibold transition"
-                            title={h.phone}
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                            {t("call_ambulance")}
-                          </a>
-                        ) : (
-                          <a
-                            href="tel:102"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-3 py-1.5 text-xs font-semibold transition border border-destructive/20"
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                            {t("call_102")}
-                          </a>
-                        )}
-                        <span
-                          className={`ml-auto inline-flex items-center gap-1 text-xs font-semibold ${
-                            isFastest ? "text-primary" : "text-muted-foreground"
-                          }`}
+                    <div className="px-4 pb-4 flex items-center gap-2">
+                      {h.phone ? (
+                        <a
+                          href={`tel:${h.phone}`}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-3 py-2 text-xs font-semibold transition border border-destructive/20"
+                          title={h.phone}
                         >
-                          {t("routes")} <ArrowRight className="h-3 w-3" />
-                        </span>
-                      </div>
+                          <Phone className="h-3.5 w-3.5" />
+                          {t("call_ambulance")}
+                        </a>
+                      ) : (
+                        <a
+                          href="tel:102"
+                          className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground px-3 py-2 text-xs font-semibold transition border border-destructive/20"
+                        >
+                          <Phone className="h-3.5 w-3.5" />
+                          {t("call_102")}
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => choose(h)}
+                        className={`ml-auto inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                          isFastest
+                            ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md shadow-destructive/20"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                      >
+                        {isFastest ? t("go_here_now") : t("routes")}
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
