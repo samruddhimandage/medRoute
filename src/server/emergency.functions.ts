@@ -87,6 +87,29 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
       }
       const kw = data.keywords.map((k) => k.toLowerCase());
 
+      // Single-specialty facility detection. If a place is clearly an
+      // Eye/Dental/ENT/Maternity/Ayush/Vet/Fertility/Cancer/Psych-only
+      // facility, it should NOT be returned for unrelated emergencies
+      // (e.g. fever/cold should not surface "Mohite Eye Hospital").
+      const SPECIALTY: Array<{ id: string; pattern: RegExp; terms: string[] }> = [
+        { id: "eye", pattern: /\b(eye|ophthal|netra|drishti|vision)\b/i, terms: ["eye", "ophthal", "vision"] },
+        { id: "dental", pattern: /\b(dental|dentist|teeth|tooth|orthodont)\b/i, terms: ["dental", "dentist", "tooth"] },
+        { id: "ent", pattern: /(\bent\b|ear[, ]+nose|nose[, ]+throat)/i, terms: ["ent", "ear", "nose", "throat"] },
+        { id: "skin", pattern: /\b(skin|derma|cosmetic|aesthet)\b/i, terms: ["skin", "derma"] },
+        { id: "maternity", pattern: /\b(maternity|gyna?ec|women|obstetric|mother\s*&?\s*child|prasuti)\b/i, terms: ["maternity", "obstetric", "gynec", "pediatric", "paediatric", "children", "women", "child"] },
+        { id: "ayush", pattern: /\b(ayurved|homeo|homoeo|unani|siddha|naturopath|panchakarma)\b/i, terms: [] },
+        { id: "veterinary", pattern: /\b(veterinar|pet hospital|animal hospital)\b/i, terms: [] },
+        { id: "fertility", pattern: /\b(fertility|ivf|test\s*tube)\b/i, terms: [] },
+        { id: "cancer", pattern: /\b(cancer|onco|tata\s+memorial)\b/i, terms: ["cancer", "onco"] },
+        { id: "cardiac", pattern: /\b(cardiac|cardio|heart\s+(hospital|institute|care|centre|center))\b/i, terms: ["cardiac", "cardio", "heart"] },
+        { id: "ortho", pattern: /\b(orthop[ae]edic|fracture)\b/i, terms: ["orthop", "fracture", "trauma", "bone"] },
+        { id: "neuro", pattern: /\b(neuro|stroke|brain)\b/i, terms: ["neuro", "stroke", "brain"] },
+        { id: "psych", pattern: /\b(psychiatr|mental health|de[-\s]?addict|rehabilitation)\b/i, terms: ["psychiatr", "mental"] },
+        { id: "kidney", pattern: /\b(dialysis|nephro|kidney)\b/i, terms: ["dialysis", "nephro", "kidney"] },
+      ];
+      // Always exclude these regardless of injury — never relevant for emergency triage.
+      const ALWAYS_EXCLUDE = new Set(["veterinary", "ayush", "fertility"]);
+
       const hospitals: Hospital[] = json.elements
         .map((el) => {
           const lat = el.lat ?? el.center?.lat;
@@ -94,6 +117,21 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
           if (typeof lat !== "number" || typeof lng !== "number") return null;
           const tags = el.tags ?? {};
           const blob = JSON.stringify(tags).toLowerCase();
+          const name: string = tags.name || tags["name:en"] || tags["operator"] || "Unnamed Hospital";
+          const haystack = `${name} ${blob}`;
+
+          // Detect specialty (use name+tags for higher confidence than blob alone).
+          const specialty = SPECIALTY.find((s) => s.pattern.test(haystack));
+          if (specialty) {
+            if (ALWAYS_EXCLUDE.has(specialty.id)) return null;
+            // Hospital is single-specialty. Only include it if the user's
+            // emergency keywords actually overlap with that specialty.
+            const overlap = specialty.terms.some((t) =>
+              kw.some((k) => k.includes(t) || t.includes(k))
+            );
+            if (!overlap) return null;
+          }
+
           const matched = kw.filter((k) => blob.includes(k));
           const distanceMeters = haversine({ lat: data.lat, lng: data.lng }, { lat, lng });
           const addrParts = [
@@ -109,7 +147,7 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
             (addrParts.length > 0 ? addrParts.join(", ") : undefined);
           return {
             id: `${el.type}/${el.id}`,
-            name: tags.name || tags["name:en"] || tags["operator"] || "Unnamed Hospital",
+            name,
             lat,
             lng,
             distanceMeters,
@@ -121,11 +159,10 @@ export const findNearbyHospitals = createServerFn({ method: "POST" })
         })
         .filter((h): h is Hospital => !!h)
         .sort((a, b) => {
-          // Primary: nearest hospitals first.
-          // Specialty-matched hospitals get a small distance "bonus" (1km credit per match)
-          // so a closely-matched hospital can outrank a marginally closer non-match.
+          // Primary: nearest first. Specialty match gets a small 500m credit;
+          // verified emergency departments get 750m credit.
           const eff = (h: Hospital) =>
-            h.distanceMeters - h.matchedKeywords.length * 1000 - (h.emergency ? 500 : 0);
+            h.distanceMeters - h.matchedKeywords.length * 500 - (h.emergency ? 750 : 0);
           return eff(a) - eff(b);
         })
         .slice(0, 10);
