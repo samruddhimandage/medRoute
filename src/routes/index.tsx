@@ -32,6 +32,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState, type Coords } from "@/lib/emergencyStore";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VoiceInput } from "@/components/VoiceInput";
+import { SymptomAI } from "@/components/SymptomAI";
+import type { SymptomAnalysis } from "@/lib/symptom.functions";
 import { useT, translateInjury, useLang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
