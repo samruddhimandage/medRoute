@@ -32,6 +32,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { emergencyStore, useEmergencyState, type Coords } from "@/lib/emergencyStore";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VoiceInput } from "@/components/VoiceInput";
+import { SymptomAI } from "@/components/SymptomAI";
+import type { SymptomAnalysis } from "@/lib/symptom.functions";
 import { useT, translateInjury, useLang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
@@ -173,6 +175,25 @@ function HomePage() {
     setInjuryId("general");
     handleSearch("general");
   }, [handleSearch]);
+
+  const handleAIResult = useCallback(
+    (r: SymptomAnalysis) => {
+      setInjuryId(r.injuryId);
+      if (r.emergency_mode) setEmergencyMode(true);
+      const localLabel =
+        translateInjury(r.injuryId, lang) ??
+        INJURY_TYPES.find((i) => i.id === r.injuryId)?.label ??
+        r.injuryId;
+      toast.success(`${r.detected_issue} → ${localLabel}`);
+      if (location) {
+        // Auto-route immediately — zero clicks
+        setTimeout(() => handleSearch(r.injuryId), 350);
+      } else {
+        toast.message("Set your location to continue.");
+      }
+    },
+    [handleSearch, lang, location]
+  );
 
   const ready = !!location && !!injury;
 
@@ -327,7 +348,10 @@ function HomePage() {
           )}
         </div>
 
-        {/* Step 2 — Triage */}
+        {/* AI Symptom Understanding — primary path */}
+        <SymptomAI onResult={handleAIResult} />
+
+        {/* Step 2 — Triage (manual fallback) */}
         <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-5 md:p-6">
           <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
             <div className="flex items-center gap-3">
