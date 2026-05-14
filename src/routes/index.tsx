@@ -176,6 +176,25 @@ function HomePage() {
     handleSearch("general");
   }, [handleSearch]);
 
+  const handleAIResult = useCallback(
+    (r: SymptomAnalysis) => {
+      setInjuryId(r.injuryId);
+      if (r.emergency_mode) setEmergencyMode(true);
+      const localLabel =
+        translateInjury(r.injuryId, lang) ??
+        INJURY_TYPES.find((i) => i.id === r.injuryId)?.label ??
+        r.injuryId;
+      toast.success(`${r.detected_issue} → ${localLabel}`);
+      if (location) {
+        // Auto-route immediately — zero clicks
+        setTimeout(() => handleSearch(r.injuryId), 350);
+      } else {
+        toast.message("Set your location to continue.");
+      }
+    },
+    [handleSearch, lang, location]
+  );
+
   const ready = !!location && !!injury;
 
   const priority = INJURY_TYPES.filter((i) => PRIORITY_IDS.includes(i.id))
