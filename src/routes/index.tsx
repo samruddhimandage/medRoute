@@ -348,7 +348,10 @@ function HomePage() {
           )}
         </div>
 
-        {/* Step 2 — Triage */}
+        {/* AI Symptom Understanding — primary path */}
+        <SymptomAI onResult={handleAIResult} />
+
+        {/* Step 2 — Triage (manual fallback) */}
         <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] p-5 md:p-6">
           <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
             <div className="flex items-center gap-3">
