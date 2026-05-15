@@ -192,7 +192,6 @@ function HomePage() {
     [handleSearch, lang, location]
   );
 
-  const ready = !!location && !!injury;
 
   // Auto-advance to Step 2 the moment an emergency type is picked manually
   const pickInjury = useCallback(
