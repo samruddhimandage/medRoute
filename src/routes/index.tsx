@@ -5,7 +5,6 @@ import {
   Locate,
   AlertTriangle,
   CheckCircle2,
-  ArrowRight,
   Brain,
   HeartPulse,
   Droplet,
@@ -15,11 +14,9 @@ import {
   Baby,
   Stethoscope,
   Plus,
-  Phone,
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { geocodeAddress } from "@/server/emergency.functions";
