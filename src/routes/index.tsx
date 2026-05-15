@@ -197,6 +197,19 @@ function HomePage() {
 
   const ready = !!location && !!injury;
 
+  // Auto-advance to Step 2 the moment an emergency type is picked manually
+  const pickInjury = useCallback(
+    (id: string) => {
+      setInjuryId(id);
+      if (location) {
+        setTimeout(() => handleSearch(id), 200);
+      } else {
+        toast.message("Set your location to continue.");
+      }
+    },
+    [handleSearch, location]
+  );
+
   const priority = INJURY_TYPES.filter((i) => PRIORITY_IDS.includes(i.id))
     .sort((a, b) => PRIORITY_IDS.indexOf(a.id) - PRIORITY_IDS.indexOf(b.id));
   const rest = INJURY_TYPES.filter((i) => !PRIORITY_IDS.includes(i.id));
