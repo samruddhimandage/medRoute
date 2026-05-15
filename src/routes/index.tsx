@@ -5,7 +5,6 @@ import {
   Locate,
   AlertTriangle,
   CheckCircle2,
-  ArrowRight,
   Brain,
   HeartPulse,
   Droplet,
@@ -15,11 +14,9 @@ import {
   Baby,
   Stethoscope,
   Plus,
-  Phone,
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { geocodeAddress } from "@/server/emergency.functions";
@@ -195,59 +192,28 @@ function HomePage() {
     [handleSearch, lang, location]
   );
 
-  const ready = !!location && !!injury;
+
+  // Auto-advance to Step 2 the moment an emergency type is picked manually
+  const pickInjury = useCallback(
+    (id: string) => {
+      setInjuryId(id);
+      if (location) {
+        setTimeout(() => handleSearch(id), 200);
+      } else {
+        toast.message("Set your location to continue.");
+      }
+    },
+    [handleSearch, location]
+  );
 
   const priority = INJURY_TYPES.filter((i) => PRIORITY_IDS.includes(i.id))
     .sort((a, b) => PRIORITY_IDS.indexOf(a.id) - PRIORITY_IDS.indexOf(b.id));
   const rest = INJURY_TYPES.filter((i) => !PRIORITY_IDS.includes(i.id));
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-32">
+    <div className="min-h-screen bg-background text-foreground pb-10">
       <Toaster richColors position="top-center" />
       <SiteHeader step={1} stepLabel={t("step_triage")} />
-
-      {/* Sticky top action bar — always visible during stress */}
-      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto max-w-6xl px-4 md:px-6 py-2.5 flex items-center gap-2">
-          <a
-            href="tel:112"
-            className="inline-flex items-center gap-2 rounded-lg bg-destructive text-destructive-foreground px-3 py-2 text-sm font-bold hover:opacity-90 active:scale-[0.98] transition shadow-sm"
-            aria-label="Call emergency 112"
-          >
-            <Phone className="h-4 w-4" />
-            {t("call_112_now")}
-          </a>
-          <button
-            type="button"
-            onClick={() => setEmergencyMode((v) => !v)}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold border transition active:scale-[0.98] ${
-              emergencyMode
-                ? "bg-destructive/10 text-destructive border-destructive/40"
-                : "bg-card text-foreground border-border hover:border-primary/40"
-            }`}
-            aria-pressed={emergencyMode}
-            title={emergencyMode ? t("emergency_mode_on") : t("emergency_mode_off")}
-          >
-            <Zap className={`h-4 w-4 ${emergencyMode ? "fill-destructive" : ""}`} />
-            {t("emergency_mode")}
-            <span className={`ml-1 text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 ${
-              emergencyMode ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-            }`}>{emergencyMode ? "ON" : "OFF"}</span>
-          </button>
-          <div className="ml-auto hidden md:block text-xs text-muted-foreground truncate max-w-[300px]">
-            {location ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {locationLabel}
-              </span>
-            ) : autoDetecting ? (
-              t("detecting_auto")
-            ) : (
-              "No location set"
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Reassurance hero */}
       <section className="border-b border-border bg-gradient-to-b from-accent/30 to-transparent">
@@ -383,7 +349,7 @@ function HomePage() {
                 <button
                   key={tp.id}
                   type="button"
-                  onClick={() => setInjuryId(tp.id)}
+                  onClick={() => pickInjury(tp.id)}
                   className={`relative text-left rounded-xl border-2 p-4 transition-all active:scale-[0.98] min-h-[112px] ${
                     active
                       ? "border-primary bg-primary/[0.05] ring-2 ring-primary/30"
@@ -435,7 +401,7 @@ function HomePage() {
                   <button
                     key={tp.id}
                     type="button"
-                    onClick={() => setInjuryId(tp.id)}
+                    onClick={() => pickInjury(tp.id)}
                     className={`text-left rounded-lg border p-3 transition active:scale-[0.98] ${
                       active
                         ? "border-primary bg-primary/[0.04] ring-1 ring-primary/30"
@@ -458,39 +424,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Sticky bottom CTA — impossible to miss */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">
-        <div className="mx-auto max-w-6xl px-4 md:px-6 py-3 flex items-center gap-3">
-          <div className="hidden sm:flex flex-col text-xs">
-            <span className="font-semibold text-foreground">
-              {ready ? t("ready") : t("complete_steps")}
-            </span>
-            <span className="text-muted-foreground">
-              {location ? "✓" : "○"} location · {injury ? `✓ ${translateInjury(injury.id, lang) ?? injury.label}` : `○ emergency`}
-            </span>
-          </div>
-          <a
-            href="tel:112"
-            className="sm:ml-auto inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 h-14 text-sm font-semibold transition active:scale-[0.98]"
-          >
-            <Phone className="h-4 w-4" />
-            <span className="hidden sm:inline">Call 112</span>
-          </a>
-          <Button
-            onClick={() => handleSearch()}
-            disabled={loading || !ready}
-            size="lg"
-            className={`flex-1 sm:flex-none sm:min-w-[260px] h-14 px-6 text-base font-bold transition active:scale-[0.98] ${
-              ready
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {loading ? t("please_wait") : t("find_care")}
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
