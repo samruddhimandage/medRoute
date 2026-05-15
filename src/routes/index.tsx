@@ -405,7 +405,7 @@ function HomePage() {
                   <button
                     key={tp.id}
                     type="button"
-                    onClick={() => setInjuryId(tp.id)}
+                    onClick={() => pickInjury(tp.id)}
                     className={`text-left rounded-lg border p-3 transition active:scale-[0.98] ${
                       active
                         ? "border-primary bg-primary/[0.04] ring-1 ring-primary/30"
