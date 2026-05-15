@@ -353,7 +353,7 @@ function HomePage() {
                 <button
                   key={tp.id}
                   type="button"
-                  onClick={() => setInjuryId(tp.id)}
+                  onClick={() => pickInjury(tp.id)}
                   className={`relative text-left rounded-xl border-2 p-4 transition-all active:scale-[0.98] min-h-[112px] ${
                     active
                       ? "border-primary bg-primary/[0.05] ring-2 ring-primary/30"
