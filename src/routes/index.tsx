@@ -215,52 +215,9 @@ function HomePage() {
   const rest = INJURY_TYPES.filter((i) => !PRIORITY_IDS.includes(i.id));
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-32">
+    <div className="min-h-screen bg-background text-foreground pb-10">
       <Toaster richColors position="top-center" />
       <SiteHeader step={1} stepLabel={t("step_triage")} />
-
-      {/* Sticky top action bar — always visible during stress */}
-      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto max-w-6xl px-4 md:px-6 py-2.5 flex items-center gap-2">
-          <a
-            href="tel:112"
-            className="inline-flex items-center gap-2 rounded-lg bg-destructive text-destructive-foreground px-3 py-2 text-sm font-bold hover:opacity-90 active:scale-[0.98] transition shadow-sm"
-            aria-label="Call emergency 112"
-          >
-            <Phone className="h-4 w-4" />
-            {t("call_112_now")}
-          </a>
-          <button
-            type="button"
-            onClick={() => setEmergencyMode((v) => !v)}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold border transition active:scale-[0.98] ${
-              emergencyMode
-                ? "bg-destructive/10 text-destructive border-destructive/40"
-                : "bg-card text-foreground border-border hover:border-primary/40"
-            }`}
-            aria-pressed={emergencyMode}
-            title={emergencyMode ? t("emergency_mode_on") : t("emergency_mode_off")}
-          >
-            <Zap className={`h-4 w-4 ${emergencyMode ? "fill-destructive" : ""}`} />
-            {t("emergency_mode")}
-            <span className={`ml-1 text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 ${
-              emergencyMode ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-            }`}>{emergencyMode ? "ON" : "OFF"}</span>
-          </button>
-          <div className="ml-auto hidden md:block text-xs text-muted-foreground truncate max-w-[300px]">
-            {location ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {locationLabel}
-              </span>
-            ) : autoDetecting ? (
-              t("detecting_auto")
-            ) : (
-              "No location set"
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Reassurance hero */}
       <section className="border-b border-border bg-gradient-to-b from-accent/30 to-transparent">
