@@ -428,39 +428,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Sticky bottom CTA — impossible to miss */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">
-        <div className="mx-auto max-w-6xl px-4 md:px-6 py-3 flex items-center gap-3">
-          <div className="hidden sm:flex flex-col text-xs">
-            <span className="font-semibold text-foreground">
-              {ready ? t("ready") : t("complete_steps")}
-            </span>
-            <span className="text-muted-foreground">
-              {location ? "✓" : "○"} location · {injury ? `✓ ${translateInjury(injury.id, lang) ?? injury.label}` : `○ emergency`}
-            </span>
-          </div>
-          <a
-            href="tel:112"
-            className="sm:ml-auto inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground px-4 h-14 text-sm font-semibold transition active:scale-[0.98]"
-          >
-            <Phone className="h-4 w-4" />
-            <span className="hidden sm:inline">Call 112</span>
-          </a>
-          <Button
-            onClick={() => handleSearch()}
-            disabled={loading || !ready}
-            size="lg"
-            className={`flex-1 sm:flex-none sm:min-w-[260px] h-14 px-6 text-base font-bold transition active:scale-[0.98] ${
-              ready
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {loading ? t("please_wait") : t("find_care")}
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
