@@ -54,7 +54,7 @@ MedRoute simplifies this process by helping users reach the right hospital as qu
 
 ## Live Demo
 
-Add your deployed application link here.
+[Add your deployed application link here.](https://first-aid-route.lovable.app/)
 
 ## Author
 
